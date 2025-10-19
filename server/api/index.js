@@ -48,6 +48,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Public test endpoint (no auth required)
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    message: 'Server is working!',
+    timestamp: new Date().toISOString(),
+    cors: 'enabled'
+  });
+});
+
 // Test endpoint
 app.get('/api/auth/test', (req, res) => {
   res.json({ 
