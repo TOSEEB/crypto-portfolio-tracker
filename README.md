@@ -2,8 +2,6 @@
 
 A full-stack cryptocurrency portfolio tracking application with real-time price updates, portfolio management, and Google OAuth authentication.
 
-![Crypto Tracker](https://img.shields.io/badge/React-18.2.0-blue) ![Node.js](https://img.shields.io/badge/Node.js-Express-green) ![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-blue) ![API](https://img.shields.io/badge/API-CoinMarketCap-orange)
-
 ## ✨ Features
 
 ### 🔐 Authentication & Security
@@ -67,7 +65,7 @@ A full-stack cryptocurrency portfolio tracking application with real-time price 
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/crypto-price-tracker.git
+git clone https://github.com/TOSEEB/crypto-portfolio-tracker.git
 cd crypto-price-tracker
 ```
 
@@ -117,37 +115,7 @@ npm start
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:5000
 
-## 📱 Screenshots
 
-### Dashboard
-![Dashboard](https://via.placeholder.com/800x400/1a1a1a/ffffff?text=Dashboard+View)
-
-### Portfolio Management
-![Portfolio](https://via.placeholder.com/800x400/1a1a1a/ffffff?text=Portfolio+Management)
-
-### Real-time Prices
-![Prices](https://via.placeholder.com/800x400/1a1a1a/ffffff?text=Real-time+Prices)
-
-## 🔧 API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-- `GET /api/auth/google` - Google OAuth
-- `POST /api/auth/forgot-password` - Password reset
-
-### Cryptocurrency Data
-- `GET /api/crypto` - Get all cryptocurrencies
-- `GET /api/crypto/:symbol` - Get specific crypto
-- `POST /api/crypto/manual-update` - Update prices
-
-### Portfolio Management
-- `GET /api/portfolio` - Get user portfolio
-- `POST /api/portfolio` - Add to portfolio
-- `PUT /api/portfolio/:id` - Update portfolio entry
-- `DELETE /api/portfolio/:id` - Remove from portfolio
-
-## 🌐 Deployment
 
 ### Vercel Deployment
 This project is configured for easy deployment on Vercel:
@@ -195,35 +163,6 @@ EMAIL_PASS=your_app_password
 REACT_APP_API_URL=http://localhost:5000
 ```
 
-## 📊 Database Schema
-
-### Users Table
-- `id` - Primary key
-- `username` - Unique username
-- `email` - Unique email
-- `password` - Hashed password
-- `google_id` - Google OAuth ID
-- `created_at` - Timestamp
-
-### Cryptocurrencies Table
-- `id` - Primary key
-- `symbol` - Crypto symbol (BTC, ETH, etc.)
-- `name` - Full name
-- `current_price` - Current USD price
-- `market_cap` - Market capitalization
-- `volume_24h` - 24h trading volume
-- `price_change_24h` - 24h price change %
-- `last_updated` - Last update timestamp
-
-### Portfolio Table
-- `id` - Primary key
-- `user_id` - Foreign key to users
-- `crypto_id` - Foreign key to cryptocurrencies
-- `amount` - Amount of crypto owned
-- `purchase_price` - Average purchase price
-- `notes` - Investment notes
-- `created_at` - Timestamp
-
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -236,12 +175,6 @@ REACT_APP_API_URL=http://localhost:5000
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 👨‍💻 Author
-
-**Your Name**
-- GitHub: [@yourusername](https://github.com/yourusername)
-- LinkedIn: [Your LinkedIn](https://linkedin.com/in/yourprofile)
-- Email: your.email@example.com
 
 ## 🙏 Acknowledgments
 
