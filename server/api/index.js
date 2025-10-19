@@ -12,16 +12,9 @@ const portfolioRoutes = require('../routes/portfolio');
 const app = express();
 
 // Middleware
-app.use(helmet());
+// app.use(helmet()); // Temporarily disabled
 app.use(cors({
-  origin: [
-    process.env.CLIENT_URL || 'http://localhost:3000',
-    'https://client-psi-eight-53.vercel.app',
-    'https://client-9hm4jrkax-toseeb-begs-projects.vercel.app',
-    'https://client-rhun2l5j7-toseeb-begs-projects.vercel.app',
-    'https://client-dla3jo08m-toseeb-begs-projects.vercel.app',
-    'https://client-4f6qhs0cf-toseeb-begs-projects.vercel.app'
-  ],
+  origin: true, // Allow all origins for now
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
