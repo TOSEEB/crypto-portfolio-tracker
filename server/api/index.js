@@ -18,7 +18,8 @@ app.use(cors({
     process.env.CLIENT_URL || 'http://localhost:3000',
     'https://client-psi-eight-53.vercel.app',
     'https://client-9hm4jrkax-toseeb-begs-projects.vercel.app',
-    'https://client-rhun2l5j7-toseeb-begs-projects.vercel.app'
+    'https://client-rhun2l5j7-toseeb-begs-projects.vercel.app',
+    'https://client-dla3jo08m-toseeb-begs-projects.vercel.app'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
