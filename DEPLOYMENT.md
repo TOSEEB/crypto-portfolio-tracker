@@ -27,13 +27,13 @@ vercel
 # - DB_USER=your-db-user
 # - DB_PASSWORD=your-db-password
 # - JWT_SECRET=your-secure-jwt-secret
-# - COINMARKETCAP_API_KEY=00811f69eabc4d26a95766eb1271c0f4
-# - GOOGLE_CLIENT_ID=1019853135153-es41vums7uut6skbklklajboti70q0ac.apps.googleusercontent.com
-# - GOOGLE_CLIENT_SECRET=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
+# - COINMARKETCAP_API_KEY=your_coinmarketcap_api_key
+# - GOOGLE_CLIENT_ID=your_google_client_id
+# - GOOGLE_CLIENT_SECRET=your_google_client_secret
 # - CLIENT_URL=https://your-frontend-app.vercel.app
 # - SERVER_URL=https://your-backend-app.vercel.app
-# - EMAIL_USER=chrishemsworth776655@gmail.com
-# - EMAIL_PASS=noxialpqpegkobmo
+# - EMAIL_USER=your_email@gmail.com
+# - EMAIL_PASS=your_app_password
 ```
 
 ### 2. Deploy Frontend (Client)
@@ -86,13 +86,13 @@ Update `client/src/setupProxy.js` or axios base URL to point to your backend URL
 - DB_USER=your-db-user
 - DB_PASSWORD=your-db-password
 - JWT_SECRET=your-secure-jwt-secret
-- COINMARKETCAP_API_KEY=00811f69eabc4d26a95766eb1271c0f4
-- GOOGLE_CLIENT_ID=1019853135153-es41vums7uut6skbklklajboti70q0ac.apps.googleusercontent.com
-- GOOGLE_CLIENT_SECRET=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
+- COINMARKETCAP_API_KEY=your_coinmarketcap_api_key
+- GOOGLE_CLIENT_ID=your_google_client_id
+- GOOGLE_CLIENT_SECRET=your_google_client_secret
 - CLIENT_URL=https://your-frontend-app.vercel.app
 - SERVER_URL=https://your-backend-app.vercel.app
-- EMAIL_USER=chrishemsworth776655@gmail.com
-- EMAIL_PASS=noxialpqpegkobmo
+- EMAIL_USER=your_email@gmail.com
+- EMAIL_PASS=your_app_password
 
 ### Frontend (Client) Environment Variables:
 - REACT_APP_API_URL=https://your-backend-app.vercel.app
