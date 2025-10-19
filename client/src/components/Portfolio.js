@@ -210,7 +210,7 @@ const Portfolio = () => {
                       <div className="portfolio-edit-form">
                         <div className="edit-form-grid">
                           <div className="form-group">
-                            <label className="form-label">Amount</label>
+                            <label className="form-label">{item.symbol} Amount</label>
                             <input
                               type="number"
                               step="any"
@@ -268,8 +268,8 @@ const Portfolio = () => {
 
                         <div className="portfolio-item-details">
                           <div className="detail">
-                            <span className="detail-label">Amount:</span>
-                            <span className="detail-value">{item.amount}</span>
+                            <span className="detail-label">{item.symbol} Holdings:</span>
+                            <span className="detail-value">{item.amount} {item.symbol}</span>
                           </div>
                           <div className="detail">
                             <span className="detail-label">Avg Price:</span>
