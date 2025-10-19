@@ -1,0 +1,145 @@
+.crypto-table-container {
+  overflow-x: auto;
+  height: auto;
+  min-height: 50vh;
+  overflow-y: visible;
+  flex: 1;
+}
+
+.crypto-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  table-layout: fixed;
+}
+
+.crypto-table th {
+  background-color: #f8fafc;
+  padding: 12px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.crypto-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.crypto-row {
+  transition: background-color 0.2s ease;
+}
+
+.crypto-row:hover {
+  background-color: #f9fafb;
+}
+
+.crypto-row.clickable {
+  cursor: pointer;
+}
+
+.crypto-name-cell {
+  width: 20%;
+}
+
+.crypto-name-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.crypto-symbol {
+  font-weight: 700;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.crypto-name {
+  color: #6b7280;
+  font-size: 10px;
+}
+
+.crypto-price {
+  font-weight: 600;
+  color: #1f2937;
+  width: 15%;
+}
+
+.crypto-change {
+  font-weight: 600;
+  width: 12%;
+}
+
+.crypto-change.positive {
+  color: #10b981;
+}
+
+.crypto-change.negative {
+  color: #ef4444;
+}
+
+.crypto-market-cap {
+  color: #6b7280;
+  width: 15%;
+}
+
+.crypto-volume {
+  color: #6b7280;
+  width: 15%;
+}
+
+.crypto-actions {
+  width: 18%;
+}
+
+.crypto-table-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+}
+
+@media (max-width: 768px) {
+  .crypto-table {
+    font-size: 12px;
+  }
+  
+  .crypto-table th,
+  .crypto-table td {
+    padding: 10px 8px;
+  }
+  
+  .crypto-name-cell {
+    min-width: 150px;
+  }
+  
+  .crypto-price,
+  .crypto-market-cap,
+  .crypto-volume {
+    min-width: 100px;
+  }
+  
+  .crypto-change {
+    min-width: 80px;
+  }
+  
+  .crypto-actions {
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 480px) {
+  .crypto-table th:nth-child(4),
+  .crypto-table td:nth-child(4),
+  .crypto-table th:nth-child(5),
+  .crypto-table td:nth-child(5) {
+    display: none;
+  }
+}

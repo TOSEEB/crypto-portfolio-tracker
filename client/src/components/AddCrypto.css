@@ -1,0 +1,227 @@
+.add-crypto {
+  padding: 40px 0;
+}
+
+.add-crypto-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.add-crypto-title {
+  font-size: 36px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 8px;
+}
+
+.add-crypto-subtitle {
+  font-size: 18px;
+  color: #6b7280;
+}
+
+.add-crypto-content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 32px;
+}
+
+.add-crypto-form-section {
+  width: 100%;
+}
+
+.add-crypto-info-section {
+  width: 100%;
+}
+
+.add-crypto-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.crypto-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.crypto-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.crypto-item:hover {
+  border-color: #3b82f6;
+  background: #f8fafc;
+}
+
+.crypto-item.selected {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.crypto-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.crypto-symbol {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.crypto-name {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.crypto-price {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+textarea.form-input {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Form Notice */
+.form-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.notice-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.notice-content h4 {
+  margin: 0 0 8px 0;
+  color: #166534;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.notice-content p {
+  margin: 0;
+  color: #166534;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Label Help */
+.label-help {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: normal;
+  margin-left: 8px;
+}
+
+/* Form Help */
+.form-help {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+/* Calculation Helper */
+.calculation-helper {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.calculation-helper h4 {
+  margin: 0 0 16px 0;
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.calculation-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.calc-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.calc-item.total {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.calc-label {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.calc-value {
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.calc-item.total .calc-value {
+  color: #059669;
+  font-size: 16px;
+}
+
+@media (max-width: 768px) {
+  .add-crypto-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .add-crypto-title {
+    font-size: 28px;
+  }
+}
