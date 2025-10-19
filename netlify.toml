@@ -1,8 +1,14 @@
 [build]
-  command = "echo 'No build needed'"
+  command = "cd client && npm install && npm run build"
+  publish = "client/build"
   functions = "netlify/functions"
 
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/server"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
   status = 200

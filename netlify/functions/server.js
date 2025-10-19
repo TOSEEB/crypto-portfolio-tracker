@@ -21,11 +21,46 @@ app.get('/api/test', (req, res) => {
   });
 });
 
-// Auth register endpoint
+// Auth endpoints
 app.post('/api/auth/register', (req, res) => {
   res.json({ 
     message: 'Register endpoint working!',
-    user: req.body
+    user: req.body,
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  res.json({ 
+    message: 'Login endpoint working!',
+    user: req.body,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Crypto endpoints
+app.get('/api/crypto', (req, res) => {
+  res.json({ 
+    message: 'Crypto endpoint working!',
+    cryptos: [],
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Portfolio endpoints
+app.get('/api/portfolio', (req, res) => {
+  res.json({ 
+    message: 'Portfolio endpoint working!',
+    portfolio: [],
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.post('/api/portfolio', (req, res) => {
+  res.json({ 
+    message: 'Add to portfolio working!',
+    data: req.body,
+    timestamp: new Date().toISOString()
   });
 });
 
