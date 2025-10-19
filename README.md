@@ -65,7 +65,7 @@ A full-stack cryptocurrency portfolio tracking application with real-time price 
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/crypto-price-tracker.git
+git clone https://github.com/TOSEEB/crypto-portfolio-tracker.git
 cd crypto-price-tracker
 ```
 
