@@ -2,7 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const { Pool } = require('pg');
-const { createClient } = require('@supabase/supabase-js');
+// Use dynamic import for Supabase to avoid module resolution issues
+// const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 
@@ -29,16 +30,23 @@ const getPool = () => {
   return pool;
 };
 
-// Supabase client (HTTPS) - avoids direct Postgres connection issues on Netlify
-const getSupabase = () => {
+// Supabase client with dynamic import to avoid module resolution issues
+const getSupabase = async () => {
   if (!supabase) {
-    const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-    if (url && key) {
-      supabase = createClient(url, key, { auth: { persistSession: false } });
-      console.log('Supabase client initialized');
-    } else {
-      console.log('Supabase env missing, skipping client init');
+    try {
+      // Dynamic import to avoid module resolution issues
+      const { createClient } = await import('@supabase/supabase-js');
+      const url = process.env.SUPABASE_URL;
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+      if (url && key) {
+        supabase = createClient(url, key, { auth: { persistSession: false } });
+        console.log('Supabase client initialized');
+      } else {
+        console.log('Supabase env missing, skipping client init');
+      }
+    } catch (error) {
+      console.log('Supabase client creation failed:', error.message);
+      return null;
     }
   }
   return supabase;
@@ -48,7 +56,7 @@ const getSupabase = () => {
 const initDatabase = async () => {
   try {
     if (process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)) {
-      getSupabase();
+      await getSupabase();
       console.log('Using Supabase for persistence; skipping direct Postgres table creation.');
       return true;
     }
@@ -990,7 +998,7 @@ exports.handler = async (event, context) => {
         
         // Try Supabase first, then Postgres
         try {
-          const sb = getSupabase();
+          const sb = await getSupabase();
           if (sb) {
             const { data, error } = await sb
               .from('portfolios')
@@ -1275,7 +1283,7 @@ exports.handler = async (event, context) => {
         
         // Try Supabase first, then Postgres
         try {
-          const sb = getSupabase();
+          const sb = await getSupabase();
           if (sb) {
             const { data, error } = await sb
               .from('portfolios')
