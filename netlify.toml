@@ -1,5 +1,5 @@
 [build]
-  command = "cd client && npm install --no-optional --no-audit && npm run build"
+  command = "cd netlify/functions && npm install && cd ../../client && npm install --no-optional --no-audit && npm run build"
   publish = "client/build"
   functions = "netlify/functions"
 
