@@ -21,6 +21,9 @@
     "chart.js": "^4.4.0",
     "react-chartjs-2": "^5.2.0"
   },
+  "resolutions": {
+    "@pmmmwh/react-refresh-webpack-plugin": "0.5.11"
+  },
   "browserslist": {
     "production": [
       ">0.2%",
