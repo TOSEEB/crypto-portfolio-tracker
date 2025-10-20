@@ -16,41 +16,109 @@ app.use(express.json());
 
 // Helper function to fetch crypto data from CoinMarketCap
 const fetchCryptoData = async () => {
+  const mockData = [
+    {
+      id: 'bitcoin',
+      name: 'Bitcoin',
+      symbol: 'BTC',
+      price: 67234.56,
+      change24h: 2.5,
+      marketCap: 1320000000000,
+      volume: 25000000000
+    },
+    {
+      id: 'ethereum',
+      name: 'Ethereum',
+      symbol: 'ETH',
+      price: 3456.78,
+      change24h: 1.8,
+      marketCap: 415000000000,
+      volume: 15000000000
+    },
+    {
+      id: 'tether',
+      name: 'Tether USDt',
+      symbol: 'USDT',
+      price: 1.00,
+      change24h: 0.01,
+      marketCap: 95000000000,
+      volume: 35000000000
+    },
+    {
+      id: 'bnb',
+      name: 'BNB',
+      symbol: 'BNB',
+      price: 567.89,
+      change24h: -0.5,
+      marketCap: 85000000000,
+      volume: 1200000000
+    },
+    {
+      id: 'xrp',
+      name: 'XRP',
+      symbol: 'XRP',
+      price: 0.6234,
+      change24h: 3.2,
+      marketCap: 35000000000,
+      volume: 2800000000
+    },
+    {
+      id: 'solana',
+      name: 'Solana',
+      symbol: 'SOL',
+      price: 98.45,
+      change24h: 5.7,
+      marketCap: 42000000000,
+      volume: 1800000000
+    },
+    {
+      id: 'usd-coin',
+      name: 'USDC',
+      symbol: 'USDC',
+      price: 1.00,
+      change24h: 0.01,
+      marketCap: 32000000000,
+      volume: 4500000000
+    },
+    {
+      id: 'tron',
+      name: 'TRON',
+      symbol: 'TRX',
+      price: 0.1234,
+      change24h: 1.5,
+      marketCap: 11000000000,
+      volume: 850000000
+    },
+    {
+      id: 'dogecoin',
+      name: 'Dogecoin',
+      symbol: 'DOGE',
+      price: 0.0892,
+      change24h: -2.1,
+      marketCap: 12800000000,
+      volume: 1200000000
+    },
+    {
+      id: 'cardano',
+      name: 'Cardano',
+      symbol: 'ADA',
+      price: 0.4567,
+      change24h: -1.2,
+      marketCap: 16000000000,
+      volume: 650000000
+    }
+  ];
+
   try {
     const apiKey = process.env.COINMARKETCAP_API_KEY;
+    console.log('API Key exists:', !!apiKey);
+    
     if (!apiKey) {
       console.log('No CoinMarketCap API key found, using mock data');
-      return [
-        {
-          id: 'bitcoin',
-          name: 'Bitcoin',
-          symbol: 'BTC',
-          price: 50000,
-          change24h: 2.5,
-          marketCap: 1000000000000,
-          volume: 25000000000
-        },
-        {
-          id: 'ethereum',
-          name: 'Ethereum',
-          symbol: 'ETH',
-          price: 3000,
-          change24h: 1.8,
-          marketCap: 400000000000,
-          volume: 15000000000
-        },
-        {
-          id: 'cardano',
-          name: 'Cardano',
-          symbol: 'ADA',
-          price: 0.5,
-          change24h: -1.2,
-          marketCap: 20000000000,
-          volume: 500000000
-        }
-      ];
+      return mockData;
     }
 
+    console.log('Attempting to fetch from CoinMarketCap API...');
     const response = await axios.get('https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest', {
       headers: {
         'X-CMC_PRO_API_KEY': apiKey,
@@ -60,50 +128,32 @@ const fetchCryptoData = async () => {
         start: 1,
         limit: 10,
         convert: 'USD'
-      }
+      },
+      timeout: 10000 // 10 second timeout
     });
 
-    return response.data.data.map(crypto => ({
-      id: crypto.slug,
-      name: crypto.name,
-      symbol: crypto.symbol,
-      price: crypto.quote.USD.price,
-      change24h: crypto.quote.USD.percent_change_24h,
-      marketCap: crypto.quote.USD.market_cap,
-      volume: crypto.quote.USD.volume_24h
-    }));
+    console.log('API Response status:', response.status);
+    console.log('API Response data length:', response.data.data?.length);
+
+    if (response.data && response.data.data) {
+      return response.data.data.map(crypto => ({
+        id: crypto.slug,
+        name: crypto.name,
+        symbol: crypto.symbol,
+        price: crypto.quote.USD.price,
+        change24h: crypto.quote.USD.percent_change_24h,
+        marketCap: crypto.quote.USD.market_cap,
+        volume: crypto.quote.USD.volume_24h
+      }));
+    } else {
+      console.log('Invalid API response structure, using mock data');
+      return mockData;
+    }
   } catch (error) {
     console.error('Error fetching crypto data:', error.message);
-    // Return mock data if API fails
-    return [
-      {
-        id: 'bitcoin',
-        name: 'Bitcoin',
-        symbol: 'BTC',
-        price: 50000,
-        change24h: 2.5,
-        marketCap: 1000000000000,
-        volume: 25000000000
-      },
-      {
-        id: 'ethereum',
-        name: 'Ethereum',
-        symbol: 'ETH',
-        price: 3000,
-        change24h: 1.8,
-        marketCap: 400000000000,
-        volume: 15000000000
-      },
-      {
-        id: 'cardano',
-        name: 'Cardano',
-        symbol: 'ADA',
-        price: 0.5,
-        change24h: -1.2,
-        marketCap: 20000000000,
-        volume: 500000000
-      }
-    ];
+    console.error('Error details:', error.response?.data || error.message);
+    console.log('Falling back to mock data');
+    return mockData;
   }
 };
 
@@ -113,6 +163,24 @@ app.get('/api/test', (req, res) => {
     message: 'Netlify server working!',
     timestamp: new Date().toISOString()
   });
+});
+
+// Debug endpoint for crypto API
+app.get('/api/debug-crypto', async (req, res) => {
+  try {
+    const cryptoData = await fetchCryptoData();
+    res.json({
+      message: 'Crypto data fetched',
+      count: cryptoData.length,
+      sample: cryptoData[0],
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Health check endpoint
@@ -226,6 +294,39 @@ exports.handler = async (event, context) => {
           environment: process.env.NODE_ENV || 'production'
         }),
       };
+    }
+
+    // Debug crypto endpoint
+    if (path === '/api/debug-crypto' && method === 'GET') {
+      try {
+        const cryptoData = await fetchCryptoData();
+        return {
+          statusCode: 200,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: 'Crypto data fetched',
+            count: cryptoData.length,
+            sample: cryptoData[0],
+            apiKeyExists: !!process.env.COINMARKETCAP_API_KEY,
+            timestamp: new Date().toISOString()
+          }),
+        };
+      } catch (error) {
+        return {
+          statusCode: 500,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            error: error.message,
+            timestamp: new Date().toISOString()
+          }),
+        };
+      }
     }
 
     // Auth endpoints
