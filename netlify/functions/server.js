@@ -687,9 +687,9 @@ exports.handler = async (event, context) => {
         // Use appropriate storage method
         if (useInMemoryStorage) {
           console.log('Using in-memory storage, portfolio items:', portfolioStorage.length);
+          const cryptoData = await fetchCryptoData();
           const updatedPortfolio = portfolioStorage.map(item => {
             // Get current prices for portfolio items
-            const cryptoData = await fetchCryptoData();
             const currentCrypto = cryptoData.find(c => c.symbol === item.crypto_symbol);
             if (currentCrypto) {
               item.current_price = currentCrypto.current_price;
