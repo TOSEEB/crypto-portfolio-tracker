@@ -95,6 +95,53 @@ app.use(express.json());
 
 // Helper function to fetch crypto data from CoinMarketCap
 const fetchCryptoData = async () => {
+  try {
+    console.log('Fetching crypto data from CoinMarketCap API...');
+    console.log('API Key exists:', !!process.env.COINMARKETCAP_API_KEY);
+    
+    if (!process.env.COINMARKETCAP_API_KEY) {
+      console.log('No API key found, using mock data');
+      return getMockCryptoData();
+    }
+
+    const response = await axios.get('https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest', {
+      headers: {
+        'X-CMC_PRO_API_KEY': process.env.COINMARKETCAP_API_KEY,
+        'Accept': 'application/json'
+      },
+      params: {
+        start: 1,
+        limit: 100,
+        convert: 'USD'
+      }
+    });
+
+    console.log('CoinMarketCap API response status:', response.status);
+    console.log('Number of cryptocurrencies:', response.data.data.length);
+
+    const cryptoData = response.data.data.map(crypto => ({
+      id: crypto.id,
+      symbol: crypto.symbol,
+      name: crypto.name,
+      current_price: crypto.quote.USD.price,
+      price_change_24h: crypto.quote.USD.percent_change_24h,
+      market_cap: crypto.quote.USD.market_cap,
+      volume_24h: crypto.quote.USD.volume_24h,
+      image: `https://s2.coinmarketcap.com/static/img/coins/64x64/${crypto.id}.png`,
+      last_updated: crypto.quote.USD.last_updated
+    }));
+
+    console.log('First crypto data:', cryptoData[0]);
+    return cryptoData;
+  } catch (error) {
+    console.error('Error fetching crypto data:', error.message);
+    console.error('Error response:', error.response?.data);
+    console.log('Falling back to mock data');
+    return getMockCryptoData();
+  }
+};
+
+const getMockCryptoData = () => {
   const mockData = [
     {
       id: 'bitcoin',
