@@ -820,8 +820,11 @@ exports.handler = async (event, context) => {
         // Check if database is initialized
         if (!dbInitialized) {
           console.log('Database not initialized for summary, attempting to initialize...');
-          await initDatabase();
-          dbInitialized = true;
+          initDatabase().then(() => {
+            dbInitialized = true;
+          }).catch(err => {
+            console.error('Database initialization failed:', err);
+          });
         }
         
         const result = await pool.query('SELECT * FROM portfolios');
@@ -891,7 +894,11 @@ exports.handler = async (event, context) => {
           // Ensure database is initialized first
           if (!dbInitialized) {
             console.log('Database not initialized, initializing now...');
-            await initDatabase();
+            initDatabase().then(() => {
+              dbInitialized = true;
+            }).catch(err => {
+              console.error('Database initialization failed:', err);
+            });
           }
           
           const result = await pool.query(
