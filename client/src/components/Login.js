@@ -9,42 +9,36 @@ const Login = () => {
     password: ''
   });
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, loginWithToken } = useAuth();
   const navigate = useNavigate();
 
-  // Handle Google OAuth success redirect (?google=success)
+  // Handle Google OAuth success redirect (?google=success&token=...)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const google = params.get('google');
-    if (google === 'success') {
-      // Use a temporary token and hydrate user from /api/auth/me
+    const token = params.get('token');
+    
+    if (google === 'success' && token) {
+      // Use the token from Google OAuth callback
       const doGoogleLogin = async () => {
         try {
-          // Reuse context helper to set token and fetch user
-          // We store a placeholder token; backend /api/auth/me returns demo user
-          const { loginWithToken } = require('../context/AuthContext');
-        } catch (e) {
-          // fallback to context method available via hook
-        }
-      };
-      (async () => {
-        try {
-          // Call the context method directly
-          const { loginWithToken } = useAuth();
-          const result = await loginWithToken('google-oauth-token');
+          const result = await loginWithToken(token);
           if (result.success) {
             // Clean query params
             const url = new URL(window.location.href);
             url.searchParams.delete('google');
+            url.searchParams.delete('token');
             window.history.replaceState({}, '', url.pathname);
             navigate('/dashboard');
           }
         } catch (err) {
-          // no-op; stay on login
+          console.error('Google login failed:', err);
+          // Stay on login page
         }
-      })();
+      };
+      doGoogleLogin();
     }
-  }, [navigate]);
+  }, [navigate, loginWithToken]);
 
   const handleChange = (e) => {
     setFormData({

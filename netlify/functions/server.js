@@ -583,21 +583,56 @@ exports.handler = async (event, context) => {
         };
       }
 
-      return {
-        statusCode: 200,
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user: {
-            id: 1,
-            email: 'user@example.com',
-            name: 'Demo User'
+      try {
+        // Extract token and decode it
+        const token = authHeader.split(' ')[1];
+        const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
+        
+        // Check if token is expired
+        if (decoded.exp && Date.now() > decoded.exp) {
+          return {
+            statusCode: 401,
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              error: 'Token expired',
+              timestamp: new Date().toISOString()
+            }),
+          };
+        }
+
+        return {
+          statusCode: 200,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
           },
-          timestamp: new Date().toISOString()
-        }),
-      };
+          body: JSON.stringify({
+            user: {
+              id: decoded.userId || 1,
+              email: decoded.email || 'user@gmail.com',
+              name: 'Google User',
+              username: 'google_user'
+            },
+            timestamp: new Date().toISOString()
+          }),
+        };
+      } catch (error) {
+        console.error('Token decode error:', error);
+        return {
+          statusCode: 401,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            error: 'Invalid token',
+            timestamp: new Date().toISOString()
+          }),
+        };
+      }
     }
 
     if (path === '/api/auth/forgot-password' && method === 'POST') {
@@ -648,18 +683,74 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Minimal Google OAuth callback handler
+    // Google OAuth callback handler
     if (path === '/api/auth/google/callback' && method === 'GET') {
-      const clientUrl = process.env.CLIENT_URL || '/';
-      const qs = (event.queryStringParameters && event.queryStringParameters.code) ? 'google=success' : 'google=error';
-      return {
-        statusCode: 302,
-        headers: {
-          ...headers,
-          'Location': `${clientUrl}/login?${qs}`
-        },
-        body: ''
-      };
+      try {
+        const clientUrl = process.env.CLIENT_URL || '/';
+        const code = event.queryStringParameters?.code;
+        
+        if (!code) {
+          return {
+            statusCode: 302,
+            headers: {
+              ...headers,
+              'Location': `${clientUrl}/login?google=error`
+            },
+            body: ''
+          };
+        }
+
+        // Exchange code for token (simplified - in production, use proper OAuth flow)
+        // For now, create a demo user session
+        const demoUser = {
+          id: 1,
+          username: 'google_user',
+          email: 'user@gmail.com',
+          google_id: 'google_' + Date.now()
+        };
+
+        // Create a simple JWT token (in production, use proper JWT library)
+        const token = Buffer.from(JSON.stringify({
+          userId: demoUser.id,
+          email: demoUser.email,
+          exp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+        })).toString('base64');
+
+        // Store user in database (if available)
+        try {
+          const pool = getPool();
+          await pool.query(`
+            INSERT INTO users (username, email, google_id) 
+            VALUES ($1, $2, $3) 
+            ON CONFLICT (email) DO UPDATE SET 
+            google_id = EXCLUDED.google_id,
+            updated_at = NOW()
+          `, [demoUser.username, demoUser.email, demoUser.google_id]);
+        } catch (dbError) {
+          console.log('Database not available for user storage:', dbError.message);
+        }
+
+        // Redirect to frontend with token
+        return {
+          statusCode: 302,
+          headers: {
+            ...headers,
+            'Location': `${clientUrl}/login?google=success&token=${token}`
+          },
+          body: ''
+        };
+      } catch (error) {
+        console.error('Google OAuth callback error:', error);
+        const clientUrl = process.env.CLIENT_URL || '/';
+        return {
+          statusCode: 302,
+          headers: {
+            ...headers,
+            'Location': `${clientUrl}/login?google=error`
+          },
+          body: ''
+        };
+      }
     }
 
     // Crypto endpoints
