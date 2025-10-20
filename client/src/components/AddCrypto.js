@@ -311,32 +311,7 @@ const AddCrypto = () => {
             </div>
           </div>
 
-          <div className="add-crypto-info-section">
-            <div className="card">
-              <div className="card-header">
-                <h2 className="card-title">Available Cryptocurrencies</h2>
-                <p className="card-subtitle">Select from supported cryptocurrencies</p>
-              </div>
-
-              <div className="crypto-list">
-                {cryptos.slice(0, 10).map((crypto) => (
-                  <div
-                    key={crypto.id}
-                    className={`crypto-item ${formData.symbol === crypto.symbol ? 'selected' : ''}`}
-                    onClick={() => handleCryptoSelect(crypto)}
-                  >
-                    <div className="crypto-info">
-                      <span className="crypto-symbol">{crypto.symbol}</span>
-                      <span className="crypto-name">{crypto.name}</span>
-                    </div>
-                    <div className="crypto-price">
-                      {formatPrice(crypto.current_price)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          {/* Removed the informational cryptocurrency list to keep the page focused on inputs */}
         </div>
       </div>
     </div>
