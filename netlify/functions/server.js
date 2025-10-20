@@ -107,6 +107,29 @@ app.use(cors({
 
 app.use(express.json());
 
+// Helper function to extract user ID from Authorization header
+function getUserIdFromToken(event) {
+  try {
+    const authHeader = (event.headers && (event.headers.authorization || event.headers.Authorization)) || '';
+    if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+      return null;
+    }
+    
+    const token = authHeader.split(' ')[1];
+    const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
+    
+    // Check if token is expired
+    if (decoded.exp && Date.now() > decoded.exp) {
+      return null;
+    }
+    
+    return decoded.userId || decoded.id || 1; // Default to 1 for demo
+  } catch (error) {
+    console.error('Token decode error:', error);
+    return null;
+  }
+}
+
 // Helper function to fetch crypto data from CoinMarketCap
 const fetchCryptoData = async () => {
   try {
@@ -701,11 +724,12 @@ exports.handler = async (event, context) => {
         }
 
         // Exchange code for token (simplified - in production, use proper OAuth flow)
-        // For now, create a demo user session
+        // Generate unique user ID based on timestamp and random number
+        const uniqueUserId = Math.floor(Math.random() * 1000000) + Date.now();
         const demoUser = {
-          id: 1,
-          username: 'google_user',
-          email: 'user@gmail.com',
+          id: uniqueUserId,
+          username: 'google_user_' + uniqueUserId,
+          email: 'user' + uniqueUserId + '@gmail.com',
           google_id: 'google_' + Date.now()
         };
 
@@ -851,7 +875,20 @@ exports.handler = async (event, context) => {
       try {
         console.log('Fetching portfolio...');
         
-        // Memory disabled; always use database
+        // Get user ID from token
+        const userId = getUserIdFromToken(event);
+        if (!userId) {
+          return {
+            statusCode: 401,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              error: 'Authentication required',
+              timestamp: new Date().toISOString()
+            }),
+          };
+        }
+        
+        console.log('Fetching portfolio for user ID:', userId);
         
         // Try Supabase first, then Postgres
         try {
@@ -860,6 +897,7 @@ exports.handler = async (event, context) => {
             const { data, error } = await sb
               .from('portfolios')
               .select('*')
+              .eq('user_id', userId)  // Filter by user ID
               .order('created_at', { ascending: false });
             if (error) throw error;
             const portfolio = data.map(row => ({
@@ -904,8 +942,8 @@ exports.handler = async (event, context) => {
 
           // Fallback to direct Postgres
           const pool = getPool();
-          const result = await pool.query('SELECT * FROM portfolios ORDER BY created_at DESC');
-          console.log('Portfolio query result:', result.rows.length, 'items');
+          const result = await pool.query('SELECT * FROM portfolios WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+          console.log('Portfolio query result:', result.rows.length, 'items for user', userId);
           
           const portfolio = result.rows.map(row => ({
             id: row.id,
@@ -995,11 +1033,26 @@ exports.handler = async (event, context) => {
 
     if (path === '/api/portfolio/summary' && method === 'GET') {
       try {
+        // Get user ID from token
+        const userId = getUserIdFromToken(event);
+        if (!userId) {
+          return {
+            statusCode: 401,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              error: 'Authentication required',
+              timestamp: new Date().toISOString()
+            }),
+          };
+        }
+        
+        console.log('Fetching portfolio summary for user ID:', userId);
+        
         // Prefer Supabase, then Postgres, then memory
         let portfolio = [];
         const sb = getSupabase();
         if (sb) {
-          const { data, error } = await sb.from('portfolios').select('*');
+          const { data, error } = await sb.from('portfolios').select('*').eq('user_id', userId);
           if (error) throw error;
           portfolio = data;
         } else {
@@ -1008,11 +1061,11 @@ exports.handler = async (event, context) => {
             initDatabase().then(() => { dbInitialized = true; }).catch(err => console.error('DB init failed:', err));
           }
           try {
-            const result = await pool.query('SELECT * FROM portfolios');
+            const result = await pool.query('SELECT * FROM portfolios WHERE user_id = $1', [userId]);
             portfolio = result.rows;
           } catch (e) {
-            console.log('Postgres summary failed, using in-memory:', e.message);
-            portfolio = portfolioStorage;
+            console.log('Postgres summary failed, using empty portfolio for user', userId, ':', e.message);
+            portfolio = []; // Empty portfolio for this user instead of using global storage
           }
         }
 
@@ -1072,6 +1125,21 @@ exports.handler = async (event, context) => {
 
     if (path === '/api/portfolio' && method === 'POST') {
       try {
+        // Get user ID from token
+        const userId = getUserIdFromToken(event);
+        if (!userId) {
+          return {
+            statusCode: 401,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              error: 'Authentication required',
+              timestamp: new Date().toISOString()
+            }),
+          };
+        }
+        
+        console.log('Adding portfolio item for user ID:', userId);
+        
         const body = event.body ? JSON.parse(event.body) : {};
         // Normalize incoming payload from UI
         let incomingSymbol = (body.crypto_symbol || body.symbol || '').toString().trim().toUpperCase();
@@ -1114,7 +1182,7 @@ exports.handler = async (event, context) => {
             const { data, error } = await sb
               .from('portfolios')
               .insert({
-                user_id: 1,
+                user_id: userId,  // Use actual user ID from token
                 crypto_id,
                 crypto_name,
                 crypto_symbol,
@@ -1153,7 +1221,7 @@ exports.handler = async (event, context) => {
 
           const result = await pool.query(
             'INSERT INTO portfolios (user_id, crypto_id, crypto_name, crypto_symbol, amount, purchase_price) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [1, crypto_id, crypto_name, crypto_symbol, amount, purchase_price]
+            [userId, crypto_id, crypto_name, crypto_symbol, amount, purchase_price]  // Use actual user ID
           );
 
           console.log('Crypto added successfully to PostgreSQL:', result.rows[0]);
