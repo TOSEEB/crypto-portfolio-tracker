@@ -1,8 +1,40 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const { Pool } = require('pg');
 
 const app = express();
+
+// Database connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+
+// Initialize database tables
+const initDatabase = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS portfolios (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER DEFAULT 1,
+        crypto_id VARCHAR(50) NOT NULL,
+        crypto_name VARCHAR(100) NOT NULL,
+        crypto_symbol VARCHAR(10) NOT NULL,
+        amount DECIMAL(20, 8) NOT NULL,
+        purchase_price DECIMAL(20, 8) NOT NULL,
+        purchase_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('Database tables initialized');
+  } catch (error) {
+    console.error('Database initialization error:', error.message);
+  }
+};
+
+// Initialize database on startup
+initDatabase();
 
 // CORS for all origins
 app.use(cors({
@@ -470,47 +502,139 @@ exports.handler = async (event, context) => {
 
     // Portfolio endpoints
     if (path === '/api/portfolio' && method === 'GET') {
-      return {
-        statusCode: 200,
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify([]), // Return empty array for portfolio
-      };
+      try {
+        const result = await pool.query('SELECT * FROM portfolios ORDER BY created_at DESC');
+        const portfolio = result.rows.map(row => ({
+          id: row.id,
+          crypto_id: row.crypto_id,
+          crypto_name: row.crypto_name,
+          crypto_symbol: row.crypto_symbol,
+          amount: parseFloat(row.amount),
+          purchase_price: parseFloat(row.purchase_price),
+          purchase_date: row.purchase_date,
+          current_price: 0, // Will be updated with current prices
+          current_value: 0,
+          profit_loss: 0,
+          profit_percentage: 0
+        }));
+
+        // Get current prices for portfolio items
+        const cryptoData = await fetchCryptoData();
+        const updatedPortfolio = portfolio.map(item => {
+          const currentCrypto = cryptoData.find(c => c.symbol === item.crypto_symbol);
+          if (currentCrypto) {
+            item.current_price = currentCrypto.current_price;
+            item.current_value = item.amount * currentCrypto.current_price;
+            item.profit_loss = item.current_value - (item.amount * item.purchase_price);
+            item.profit_percentage = ((item.current_value - (item.amount * item.purchase_price)) / (item.amount * item.purchase_price)) * 100;
+          }
+          return item;
+        });
+
+        return {
+          statusCode: 200,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updatedPortfolio),
+        };
+      } catch (error) {
+        console.error('Error fetching portfolio:', error);
+        return {
+          statusCode: 500,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ error: 'Failed to fetch portfolio' }),
+        };
+      }
     }
 
     if (path === '/api/portfolio/summary' && method === 'GET') {
-      return {
-        statusCode: 200,
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          totalValue: 0,
-          totalInvested: 0,
-          totalProfit: 0,
-          profitPercentage: 0,
-          portfolioCount: 0
-        }),
-      };
+      try {
+        const result = await pool.query('SELECT * FROM portfolios');
+        const portfolio = result.rows;
+        
+        let totalInvested = 0;
+        let totalValue = 0;
+        
+        const cryptoData = await fetchCryptoData();
+        
+        portfolio.forEach(item => {
+          const currentCrypto = cryptoData.find(c => c.symbol === item.crypto_symbol);
+          const invested = parseFloat(item.amount) * parseFloat(item.purchase_price);
+          totalInvested += invested;
+          
+          if (currentCrypto) {
+            totalValue += parseFloat(item.amount) * currentCrypto.current_price;
+          }
+        });
+        
+        const totalProfit = totalValue - totalInvested;
+        const profitPercentage = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
+
+        return {
+          statusCode: 200,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            totalValue: totalValue,
+            totalInvested: totalInvested,
+            totalProfit: totalProfit,
+            profitPercentage: profitPercentage,
+            portfolioCount: portfolio.length
+          }),
+        };
+      } catch (error) {
+        console.error('Error fetching portfolio summary:', error);
+        return {
+          statusCode: 500,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ error: 'Failed to fetch portfolio summary' }),
+        };
+      }
     }
 
     if (path === '/api/portfolio' && method === 'POST') {
-      const body = event.body ? JSON.parse(event.body) : {};
-      return {
-        statusCode: 200,
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: 'Add to portfolio working!',
-          data: body,
-          timestamp: new Date().toISOString()
-        }),
-      };
+      try {
+        const body = event.body ? JSON.parse(event.body) : {};
+        const { crypto_id, crypto_name, crypto_symbol, amount, purchase_price } = body;
+        
+        const result = await pool.query(
+          'INSERT INTO portfolios (crypto_id, crypto_name, crypto_symbol, amount, purchase_price) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+          [crypto_id, crypto_name, crypto_symbol, amount, purchase_price]
+        );
+        
+        return {
+          statusCode: 201,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: 'Crypto added to portfolio successfully',
+            data: result.rows[0],
+            timestamp: new Date().toISOString()
+          }),
+        };
+      } catch (error) {
+        console.error('Error adding to portfolio:', error);
+        return {
+          statusCode: 500,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ error: 'Failed to add crypto to portfolio' }),
+        };
+      }
     }
 
     // Crypto endpoints with more detail
