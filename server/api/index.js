@@ -78,5 +78,6 @@ app.use('*', (req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-// Export for Vercel
+// Export for Vercel and Netlify
 module.exports = app;
+module.exports.handler = app;
