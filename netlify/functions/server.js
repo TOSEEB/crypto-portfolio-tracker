@@ -2,8 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const { Pool } = require('pg');
-// Temporarily disable Supabase to fix deployment issues
-// const { createClient } = require('@supabase/supabase-js');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 
@@ -30,12 +29,8 @@ const getPool = () => {
   return pool;
 };
 
-// Supabase client (HTTPS) - temporarily disabled to fix deployment issues
+// Supabase client (HTTPS) - avoids direct Postgres connection issues on Netlify
 const getSupabase = () => {
-  // Temporarily return null to avoid Supabase dependency issues
-  return null;
-  
-  /*
   if (!supabase) {
     const url = process.env.SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
@@ -47,7 +42,6 @@ const getSupabase = () => {
     }
   }
   return supabase;
-  */
 };
 
 // Initialize database tables (Postgres only). If Supabase is configured, prefer that.
