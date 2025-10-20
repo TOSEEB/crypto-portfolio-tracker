@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './Auth.css';
@@ -11,6 +11,40 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  // Handle Google OAuth success redirect (?google=success)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const google = params.get('google');
+    if (google === 'success') {
+      // Use a temporary token and hydrate user from /api/auth/me
+      const doGoogleLogin = async () => {
+        try {
+          // Reuse context helper to set token and fetch user
+          // We store a placeholder token; backend /api/auth/me returns demo user
+          const { loginWithToken } = require('../context/AuthContext');
+        } catch (e) {
+          // fallback to context method available via hook
+        }
+      };
+      (async () => {
+        try {
+          // Call the context method directly
+          const { loginWithToken } = useAuth();
+          const result = await loginWithToken('google-oauth-token');
+          if (result.success) {
+            // Clean query params
+            const url = new URL(window.location.href);
+            url.searchParams.delete('google');
+            window.history.replaceState({}, '', url.pathname);
+            navigate('/dashboard');
+          }
+        } catch (err) {
+          // no-op; stay on login
+        }
+      })();
+    }
+  }, [navigate]);
 
   const handleChange = (e) => {
     setFormData({
