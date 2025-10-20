@@ -14,8 +14,25 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
   ssl: {
     rejectUnauthorized: false
-  }
+  },
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  max: 20
 });
+
+// Simple in-memory storage as fallback
+let portfolioStorage = [];
+
+// Check if database is working
+const isDatabaseWorking = async () => {
+  try {
+    await pool.query('SELECT 1');
+    return true;
+  } catch (error) {
+    console.log('Database not working, using in-memory storage:', error.message);
+    return false;
+  }
+};
 
 // Initialize database tables
 const initDatabase = async () => {
@@ -597,62 +614,84 @@ exports.handler = async (event, context) => {
     // Portfolio endpoints
     if (path === '/api/portfolio' && method === 'GET') {
       try {
-        // Check if database is initialized
-        if (!dbInitialized) {
-          console.log('Database not initialized for GET, attempting to initialize...');
-          await initDatabase();
-          dbInitialized = true;
+        const dbWorking = await isDatabaseWorking();
+        
+        if (dbWorking) {
+          // Use database
+          const result = await pool.query('SELECT * FROM portfolios ORDER BY created_at DESC');
+          console.log('Portfolio query result:', result.rows.length, 'items');
+          
+          const portfolio = result.rows.map(row => ({
+            id: row.id,
+            crypto_id: row.crypto_id,
+            crypto_name: row.crypto_name,
+            crypto_symbol: row.crypto_symbol,
+            amount: parseFloat(row.amount),
+            purchase_price: parseFloat(row.purchase_price),
+            purchase_date: row.purchase_date,
+            current_price: 0,
+            current_value: 0,
+            profit_loss: 0,
+            profit_percentage: 0
+          }));
+
+          // Get current prices for portfolio items
+          const cryptoData = await fetchCryptoData();
+          const updatedPortfolio = portfolio.map(item => {
+            const currentCrypto = cryptoData.find(c => c.symbol === item.crypto_symbol);
+            if (currentCrypto) {
+              item.current_price = currentCrypto.current_price;
+              item.current_value = item.amount * currentCrypto.current_price;
+              item.profit_loss = item.current_value - (item.amount * item.purchase_price);
+              item.profit_percentage = ((item.current_value - (item.amount * item.purchase_price)) / (item.amount * item.purchase_price)) * 100;
+            }
+            return item;
+          });
+
+          console.log('Returning portfolio with', updatedPortfolio.length, 'items from database');
+          return {
+            statusCode: 200,
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updatedPortfolio),
+          };
+        } else {
+          // Use in-memory storage
+          console.log('Using in-memory storage, portfolio count:', portfolioStorage.length);
+          
+          // Get current prices for portfolio items
+          const cryptoData = await fetchCryptoData();
+          const updatedPortfolio = portfolioStorage.map(item => {
+            const currentCrypto = cryptoData.find(c => c.symbol === item.crypto_symbol);
+            if (currentCrypto) {
+              item.current_price = currentCrypto.current_price;
+              item.current_value = item.amount * currentCrypto.current_price;
+              item.profit_loss = item.current_value - (item.amount * item.purchase_price);
+              item.profit_percentage = ((item.current_value - (item.amount * item.purchase_price)) / (item.amount * item.purchase_price)) * 100;
+            }
+            return item;
+          });
+
+          return {
+            statusCode: 200,
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updatedPortfolio),
+          };
         }
-        
-        const result = await pool.query('SELECT * FROM portfolios ORDER BY created_at DESC');
-        console.log('Portfolio query result:', result.rows.length, 'items');
-        
-        const portfolio = result.rows.map(row => ({
-          id: row.id,
-          crypto_id: row.crypto_id,
-          crypto_name: row.crypto_name,
-          crypto_symbol: row.crypto_symbol,
-          amount: parseFloat(row.amount),
-          purchase_price: parseFloat(row.purchase_price),
-          purchase_date: row.purchase_date,
-          current_price: 0,
-          current_value: 0,
-          profit_loss: 0,
-          profit_percentage: 0
-        }));
-
-        // Get current prices for portfolio items
-        const cryptoData = await fetchCryptoData();
-        const updatedPortfolio = portfolio.map(item => {
-          const currentCrypto = cryptoData.find(c => c.symbol === item.crypto_symbol);
-          if (currentCrypto) {
-            item.current_price = currentCrypto.current_price;
-            item.current_value = item.amount * currentCrypto.current_price;
-            item.profit_loss = item.current_value - (item.amount * item.purchase_price);
-            item.profit_percentage = ((item.current_value - (item.amount * item.purchase_price)) / (item.amount * item.purchase_price)) * 100;
-          }
-          return item;
-        });
-
-        console.log('Returning portfolio with', updatedPortfolio.length, 'items');
-        return {
-          statusCode: 200,
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(updatedPortfolio),
-        };
       } catch (error) {
         console.error('Error fetching portfolio:', error.message);
-        console.error('Full error:', error);
         return {
           statusCode: 200,
           headers: {
             ...headers,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify([]), // Return empty array if DB fails
+          body: JSON.stringify([]),
         };
       }
     }
@@ -726,52 +765,67 @@ exports.handler = async (event, context) => {
         const body = event.body ? JSON.parse(event.body) : {};
         const { crypto_id, crypto_name, crypto_symbol, amount, purchase_price } = body;
         
-        // Check if database is initialized
-        if (!dbInitialized) {
-          console.log('Database not initialized, attempting to initialize...');
-          await initDatabase();
-          dbInitialized = true;
+        const dbWorking = await isDatabaseWorking();
+        
+        if (dbWorking) {
+          // Use database
+          const result = await pool.query(
+            'INSERT INTO portfolios (crypto_id, crypto_name, crypto_symbol, amount, purchase_price) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [crypto_id, crypto_name, crypto_symbol, amount, purchase_price]
+          );
+          
+          return {
+            statusCode: 201,
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: 'Crypto added to portfolio successfully',
+              data: result.rows[0],
+              timestamp: new Date().toISOString()
+            }),
+          };
+        } else {
+          // Use in-memory storage
+          const newItem = {
+            id: Date.now(),
+            crypto_id,
+            crypto_name,
+            crypto_symbol,
+            amount: parseFloat(amount),
+            purchase_price: parseFloat(purchase_price),
+            purchase_date: new Date().toISOString(),
+            created_at: new Date().toISOString()
+          };
+          
+          portfolioStorage.push(newItem);
+          console.log('Added to in-memory storage:', newItem);
+          
+          return {
+            statusCode: 201,
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: 'Crypto added to portfolio successfully (in-memory storage)',
+              data: newItem,
+              timestamp: new Date().toISOString()
+            }),
+          };
         }
-        
-        const result = await pool.query(
-          'INSERT INTO portfolios (crypto_id, crypto_name, crypto_symbol, amount, purchase_price) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-          [crypto_id, crypto_name, crypto_symbol, amount, purchase_price]
-        );
-        
-        return {
-          statusCode: 201,
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            message: 'Crypto added to portfolio successfully',
-            data: result.rows[0],
-            timestamp: new Date().toISOString()
-          }),
-        };
       } catch (error) {
         console.error('Error adding to portfolio:', error.message);
-        console.error('Full error:', error);
-        
-        // Return success even if database fails (for now)
         return {
-          statusCode: 200,
+          statusCode: 500,
           headers: {
             ...headers,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            message: 'Crypto added to portfolio successfully (database may be unavailable)',
-            data: {
-              crypto_id: event.body ? JSON.parse(event.body).crypto_id : 'unknown',
-              crypto_name: event.body ? JSON.parse(event.body).crypto_name : 'unknown',
-              crypto_symbol: event.body ? JSON.parse(event.body).crypto_symbol : 'unknown',
-              amount: event.body ? JSON.parse(event.body).amount : 0,
-              purchase_price: event.body ? JSON.parse(event.body).purchase_price : 0
-            },
-            timestamp: new Date().toISOString(),
-            note: 'Database connection issue - data not persisted'
+          body: JSON.stringify({ 
+            error: 'Failed to add crypto to portfolio',
+            details: error.message 
           }),
         };
       }
