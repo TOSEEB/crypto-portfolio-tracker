@@ -89,16 +89,16 @@ const Dashboard = () => {
                       </div>
                       <div className="portfolio-item-details">
                         <div className="detail">
-                          <span className="detail-label">Amount:</span>
-                          <span className="detail-value">{item.amount}</span>
+                          <span className="detail-label">{item.symbol} Holdings:</span>
+                          <span className="detail-value">{(Number(item.amount) || 0).toFixed(8)} {item.symbol}</span>
                         </div>
                         <div className="detail">
                           <span className="detail-label">Avg Price:</span>
-                          <span className="detail-value">${item.purchase_price}</span>
+                          <span className="detail-value">${item.purchase_price && !isNaN(Number(item.purchase_price)) ? Number(item.purchase_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}</span>
                         </div>
                         <div className="detail">
                           <span className="detail-label">Current Price:</span>
-                          <span className="detail-value">${item.current_price}</span>
+                          <span className="detail-value">${item.current_price && !isNaN(Number(item.current_price)) ? Number(item.current_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}</span>
                         </div>
                         <div className="detail">
                           <span className="detail-label">P&L:</span>
