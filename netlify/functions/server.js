@@ -2,12 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const { Pool } = require('pg');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 
 // Database connection - initialize only when needed
 let pool = null;
 let dbInitialized = false;
+let supabase = null;
 
 // Simple in-memory storage as fallback
 let portfolioStorage = [];
@@ -28,9 +30,29 @@ const getPool = () => {
   return pool;
 };
 
-// Initialize database tables
+// Supabase client (HTTPS) - avoids direct Postgres connection issues on Netlify
+const getSupabase = () => {
+  if (!supabase) {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+    if (url && key) {
+      supabase = createClient(url, key, { auth: { persistSession: false } });
+      console.log('Supabase client initialized');
+    } else {
+      console.log('Supabase env missing, skipping client init');
+    }
+  }
+  return supabase;
+};
+
+// Initialize database tables (Postgres only). If Supabase is configured, prefer that.
 const initDatabase = async () => {
   try {
+    if (process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)) {
+      getSupabase();
+      console.log('Using Supabase for persistence; skipping direct Postgres table creation.');
+      return true;
+    }
     console.log('Starting database initialization...');
     console.log('DB Host:', process.env.DB_HOST);
     console.log('DB Name:', process.env.DB_NAME);
@@ -66,8 +88,9 @@ const pool = getPool();
 // Initialize database on startup
 initDatabase().then(() => {
   dbInitialized = true;
+  // If Supabase configured, prefer it; else we attempted Postgres pool
   useInMemoryStorage = false;
-  console.log('Database initialization completed - using PostgreSQL');
+  console.log('Database initialization completed - using Supabase or PostgreSQL');
 }).catch((error) => {
   console.error('Database initialization failed:', error.message);
   dbInitialized = false;
@@ -748,8 +771,56 @@ exports.handler = async (event, context) => {
           };
         }
         
-        // Try database
+        // Try Supabase first, then Postgres
         try {
+          const sb = getSupabase();
+          if (sb) {
+            const { data, error } = await sb
+              .from('portfolios')
+              .select('*')
+              .order('created_at', { ascending: false });
+            if (error) throw error;
+            const portfolio = data.map(row => ({
+              id: row.id,
+              crypto_id: row.crypto_id,
+              crypto_name: row.crypto_name,
+              crypto_symbol: row.crypto_symbol,
+              name: row.crypto_name,
+              symbol: row.crypto_symbol,
+              amount: parseFloat(row.amount),
+              purchase_price: parseFloat(row.purchase_price),
+              purchase_date: row.purchase_date,
+              current_price: 0,
+              current_value: 0,
+              profit_loss: 0,
+              profit_percentage: 0
+            }));
+
+            const cryptoData = await fetchCryptoData();
+            const updatedPortfolio = portfolio.map(item => {
+              const currentCrypto = cryptoData.find(c => c.symbol === item.crypto_symbol);
+              if (currentCrypto) {
+                item.current_price = currentCrypto.current_price;
+                item.current_value = item.amount * currentCrypto.current_price;
+                item.profit_loss = item.current_value - (item.amount * item.purchase_price);
+                item.profit_percentage = ((item.current_value - (item.amount * item.purchase_price)) / (item.amount * item.purchase_price)) * 100;
+                item.profit_loss_percentage = item.profit_percentage;
+              }
+              return item;
+            });
+
+            console.log('Returning portfolio with', updatedPortfolio.length, 'items from Supabase');
+            return {
+              statusCode: 200,
+              headers: {
+                ...headers,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(updatedPortfolio),
+            };
+          }
+
+          // Fallback to direct Postgres
           const pool = getPool();
           const result = await pool.query('SELECT * FROM portfolios ORDER BY created_at DESC');
           console.log('Portfolio query result:', result.rows.length, 'items');
@@ -946,9 +1017,40 @@ exports.handler = async (event, context) => {
           };
         }
         
-        // Try database
+        // Try Supabase first, then Postgres
         try {
-          // Ensure database is initialized first
+          const sb = getSupabase();
+          if (sb) {
+            const { data, error } = await sb
+              .from('portfolios')
+              .insert({
+                crypto_id,
+                crypto_name,
+                crypto_symbol,
+                amount,
+                purchase_price
+              })
+              .select('*')
+              .single();
+            if (error) throw error;
+
+            console.log('Crypto added successfully to Supabase:', data);
+            return {
+              statusCode: 201,
+              headers: {
+                ...headers,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                message: 'Crypto added to portfolio successfully',
+                data,
+                storage: 'supabase',
+                timestamp: new Date().toISOString()
+              }),
+            };
+          }
+
+          // Fallback to direct Postgres
           if (!dbInitialized) {
             console.log('Database not initialized, initializing now...');
             initDatabase().then(() => {
@@ -957,14 +1059,14 @@ exports.handler = async (event, context) => {
               console.error('Database initialization failed:', err);
             });
           }
-          
+
           const result = await pool.query(
             'INSERT INTO portfolios (crypto_id, crypto_name, crypto_symbol, amount, purchase_price) VALUES ($1, $2, $3, $4, $5) RETURNING *',
             [crypto_id, crypto_name, crypto_symbol, amount, purchase_price]
           );
-          
-          console.log('Crypto added successfully to database:', result.rows[0]);
-          
+
+          console.log('Crypto added successfully to PostgreSQL:', result.rows[0]);
+
           return {
             statusCode: 201,
             headers: {
@@ -974,6 +1076,7 @@ exports.handler = async (event, context) => {
             body: JSON.stringify({
               message: 'Crypto added to portfolio successfully',
               data: result.rows[0],
+              storage: 'postgres',
               timestamp: new Date().toISOString()
             }),
           };
