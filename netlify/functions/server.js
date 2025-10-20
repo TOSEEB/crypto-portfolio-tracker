@@ -489,8 +489,28 @@ exports.handler = async (event, context) => {
       };
     }
 
+    // Auth: Login (POST)
     if (path === '/api/auth/login' && method === 'POST') {
       const body = event.body ? JSON.parse(event.body) : {};
+
+      const email = typeof body.email === 'string' ? body.email.trim() : '';
+      const password = typeof body.password === 'string' ? body.password : '';
+
+      if (!email || !password) {
+        return {
+          statusCode: 400,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: 'Email and password are required'
+          }),
+        };
+      }
+
+      const username = email.includes('@') ? email.split('@')[0] : email;
+
       return {
         statusCode: 200,
         headers: {
@@ -501,8 +521,8 @@ exports.handler = async (event, context) => {
           message: 'Login successful',
           user: {
             id: 1,
-            email: body.email,
-            name: body.email.split('@')[0]
+            email,
+            name: username
           },
           token: 'mock-jwt-token-' + Date.now(),
           timestamp: new Date().toISOString()
@@ -510,10 +530,24 @@ exports.handler = async (event, context) => {
       };
     }
 
+    // Auth: Login (GET) - helpful hint for users hitting the URL directly
+    if (path === '/api/auth/login' && method === 'GET') {
+      return {
+        statusCode: 405,
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: 'Use POST with JSON body {"email","password"} to login'
+        }),
+      };
+    }
+
     if (path === '/api/auth/me' && method === 'GET') {
-      // Check for Authorization header
-      const authHeader = event.headers.authorization || event.headers.Authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // Check for Authorization header (safe parsing)
+      const authHeader = (event.headers && (event.headers.authorization || event.headers.Authorization)) || '';
+      if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
         return {
           statusCode: 401,
           headers: {
@@ -521,7 +555,7 @@ exports.handler = async (event, context) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            error: 'No token provided',
+            error: 'Missing or invalid Authorization header',
             timestamp: new Date().toISOString()
           }),
         };
