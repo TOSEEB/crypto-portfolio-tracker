@@ -63,7 +63,6 @@ const pool = getPool();
 };
 
 // Initialize database on startup
-let dbInitialized = false;
 initDatabase().then(() => {
   dbInitialized = true;
   console.log('Database initialization completed');
