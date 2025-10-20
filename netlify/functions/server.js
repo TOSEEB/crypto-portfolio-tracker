@@ -254,10 +254,91 @@ exports.handler = async (event, context) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: 'Login endpoint working!',
-          user: body,
+          message: 'Login successful',
+          user: {
+            id: 1,
+            email: body.email,
+            name: body.email.split('@')[0]
+          },
+          token: 'mock-jwt-token-' + Date.now(),
           timestamp: new Date().toISOString()
         }),
+      };
+    }
+
+    if (path === '/api/auth/me' && method === 'GET') {
+      // Check for Authorization header
+      const authHeader = event.headers.authorization || event.headers.Authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return {
+          statusCode: 401,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            error: 'No token provided',
+            timestamp: new Date().toISOString()
+          }),
+        };
+      }
+
+      return {
+        statusCode: 200,
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user: {
+            id: 1,
+            email: 'user@example.com',
+            name: 'Demo User'
+          },
+          timestamp: new Date().toISOString()
+        }),
+      };
+    }
+
+    if (path === '/api/auth/forgot-password' && method === 'POST') {
+      const body = event.body ? JSON.parse(event.body) : {};
+      return {
+        statusCode: 200,
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: 'Password reset email sent',
+          email: body.email,
+          timestamp: new Date().toISOString()
+        }),
+      };
+    }
+
+    if (path === '/api/auth/reset-password' && method === 'POST') {
+      const body = event.body ? JSON.parse(event.body) : {};
+      return {
+        statusCode: 200,
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: 'Password reset successful',
+          timestamp: new Date().toISOString()
+        }),
+      };
+    }
+
+    if (path === '/api/auth/google' && method === 'GET') {
+      return {
+        statusCode: 302,
+        headers: {
+          ...headers,
+          'Location': 'https://accounts.google.com/oauth/authorize?client_id=' + process.env.GOOGLE_CLIENT_ID + '&redirect_uri=' + encodeURIComponent(process.env.CLIENT_URL + '/auth/callback') + '&scope=email profile&response_type=code'
+        },
+        body: '',
       };
     }
 
