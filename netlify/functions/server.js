@@ -696,6 +696,7 @@ exports.handler = async (event, context) => {
               item.current_value = item.amount * currentCrypto.current_price;
               item.profit_loss = item.current_value - (item.amount * item.purchase_price);
               item.profit_percentage = ((item.current_value - (item.amount * item.purchase_price)) / (item.amount * item.purchase_price)) * 100;
+              item.profit_loss_percentage = item.profit_percentage; // Add this for frontend compatibility
             }
             return item;
           });
@@ -739,6 +740,7 @@ exports.handler = async (event, context) => {
               item.current_value = item.amount * currentCrypto.current_price;
               item.profit_loss = item.current_value - (item.amount * item.purchase_price);
               item.profit_percentage = ((item.current_value - (item.amount * item.purchase_price)) / (item.amount * item.purchase_price)) * 100;
+              item.profit_loss_percentage = item.profit_percentage; // Add this for frontend compatibility
             }
             return item;
           });
@@ -764,6 +766,7 @@ exports.handler = async (event, context) => {
               item.current_value = item.amount * currentCrypto.current_price;
               item.profit_loss = item.current_value - (item.amount * item.purchase_price);
               item.profit_percentage = ((item.current_value - (item.amount * item.purchase_price)) / (item.amount * item.purchase_price)) * 100;
+              item.profit_loss_percentage = item.profit_percentage; // Add this for frontend compatibility
             }
             return item;
           });
