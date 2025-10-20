@@ -11,6 +11,7 @@ let dbInitialized = false;
 
 // Simple in-memory storage as fallback
 let portfolioStorage = [];
+let useInMemoryStorage = false;
 
 const getPool = () => {
   if (!pool) {
@@ -65,10 +66,13 @@ const pool = getPool();
 // Initialize database on startup
 initDatabase().then(() => {
   dbInitialized = true;
-  console.log('Database initialization completed');
+  useInMemoryStorage = false;
+  console.log('Database initialization completed - using PostgreSQL');
 }).catch((error) => {
   console.error('Database initialization failed:', error.message);
   dbInitialized = false;
+  useInMemoryStorage = true;
+  console.log('Falling back to in-memory storage');
 });
 
 // CORS for all origins
@@ -680,8 +684,35 @@ exports.handler = async (event, context) => {
       try {
         console.log('Fetching portfolio...');
         
-        // Try database first, fallback to in-memory
+        // Use appropriate storage method
+        if (useInMemoryStorage) {
+          console.log('Using in-memory storage, portfolio items:', portfolioStorage.length);
+          const updatedPortfolio = portfolioStorage.map(item => {
+            // Get current prices for portfolio items
+            const cryptoData = await fetchCryptoData();
+            const currentCrypto = cryptoData.find(c => c.symbol === item.crypto_symbol);
+            if (currentCrypto) {
+              item.current_price = currentCrypto.current_price;
+              item.current_value = item.amount * currentCrypto.current_price;
+              item.profit_loss = item.current_value - (item.amount * item.purchase_price);
+              item.profit_percentage = ((item.current_value - (item.amount * item.purchase_price)) / (item.amount * item.purchase_price)) * 100;
+            }
+            return item;
+          });
+          
+          return {
+            statusCode: 200,
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updatedPortfolio),
+          };
+        }
+        
+        // Try database
         try {
+          const pool = getPool();
           const result = await pool.query('SELECT * FROM portfolios ORDER BY created_at DESC');
           console.log('Portfolio query result:', result.rows.length, 'items');
           
@@ -834,7 +865,39 @@ exports.handler = async (event, context) => {
         
         console.log('Adding crypto to portfolio:', { crypto_id, crypto_name, crypto_symbol, amount, purchase_price });
         
-        // Try database first, fallback to in-memory
+        // Use appropriate storage method
+        if (useInMemoryStorage) {
+          console.log('Using in-memory storage for adding crypto');
+          const newItem = {
+            id: Date.now(),
+            crypto_id,
+            crypto_name,
+            crypto_symbol,
+            amount: parseFloat(amount),
+            purchase_price: parseFloat(purchase_price),
+            purchase_date: new Date().toISOString(),
+            created_at: new Date().toISOString()
+          };
+          
+          portfolioStorage.push(newItem);
+          console.log('Crypto added to in-memory storage:', newItem);
+          
+          return {
+            statusCode: 201,
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: 'Crypto added to portfolio successfully',
+              data: newItem,
+              storage: 'in-memory',
+              timestamp: new Date().toISOString()
+            }),
+          };
+        }
+        
+        // Try database
         try {
           // Ensure database is initialized first
           if (!dbInitialized) {
