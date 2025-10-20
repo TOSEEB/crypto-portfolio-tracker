@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const axios = require('axios');
 
 const app = express();
 
@@ -12,6 +13,99 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Helper function to fetch crypto data from CoinMarketCap
+const fetchCryptoData = async () => {
+  try {
+    const apiKey = process.env.COINMARKETCAP_API_KEY;
+    if (!apiKey) {
+      console.log('No CoinMarketCap API key found, using mock data');
+      return [
+        {
+          id: 'bitcoin',
+          name: 'Bitcoin',
+          symbol: 'BTC',
+          price: 50000,
+          change24h: 2.5,
+          marketCap: 1000000000000,
+          volume: 25000000000
+        },
+        {
+          id: 'ethereum',
+          name: 'Ethereum',
+          symbol: 'ETH',
+          price: 3000,
+          change24h: 1.8,
+          marketCap: 400000000000,
+          volume: 15000000000
+        },
+        {
+          id: 'cardano',
+          name: 'Cardano',
+          symbol: 'ADA',
+          price: 0.5,
+          change24h: -1.2,
+          marketCap: 20000000000,
+          volume: 500000000
+        }
+      ];
+    }
+
+    const response = await axios.get('https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest', {
+      headers: {
+        'X-CMC_PRO_API_KEY': apiKey,
+        'Accept': 'application/json'
+      },
+      params: {
+        start: 1,
+        limit: 10,
+        convert: 'USD'
+      }
+    });
+
+    return response.data.data.map(crypto => ({
+      id: crypto.slug,
+      name: crypto.name,
+      symbol: crypto.symbol,
+      price: crypto.quote.USD.price,
+      change24h: crypto.quote.USD.percent_change_24h,
+      marketCap: crypto.quote.USD.market_cap,
+      volume: crypto.quote.USD.volume_24h
+    }));
+  } catch (error) {
+    console.error('Error fetching crypto data:', error.message);
+    // Return mock data if API fails
+    return [
+      {
+        id: 'bitcoin',
+        name: 'Bitcoin',
+        symbol: 'BTC',
+        price: 50000,
+        change24h: 2.5,
+        marketCap: 1000000000000,
+        volume: 25000000000
+      },
+      {
+        id: 'ethereum',
+        name: 'Ethereum',
+        symbol: 'ETH',
+        price: 3000,
+        change24h: 1.8,
+        marketCap: 400000000000,
+        volume: 15000000000
+      },
+      {
+        id: 'cardano',
+        name: 'Cardano',
+        symbol: 'ADA',
+        price: 0.5,
+        change24h: -1.2,
+        marketCap: 20000000000,
+        volume: 500000000
+      }
+    ];
+  }
+};
 
 // Test endpoint
 app.get('/api/test', (req, res) => {
@@ -169,39 +263,27 @@ exports.handler = async (event, context) => {
 
     // Crypto endpoints
     if (path === '/api/crypto' && method === 'GET') {
-      return {
-        statusCode: 200,
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify([
-          {
-            id: 'bitcoin',
-            name: 'Bitcoin',
-            symbol: 'BTC',
-            price: 50000,
-            change24h: 2.5,
-            marketCap: 1000000000000
+      try {
+        const cryptoData = await fetchCryptoData();
+        return {
+          statusCode: 200,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
           },
-          {
-            id: 'ethereum',
-            name: 'Ethereum',
-            symbol: 'ETH',
-            price: 3000,
-            change24h: 1.8,
-            marketCap: 400000000000
+          body: JSON.stringify(cryptoData),
+        };
+      } catch (error) {
+        console.error('Error in crypto endpoint:', error);
+        return {
+          statusCode: 500,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
           },
-          {
-            id: 'cardano',
-            name: 'Cardano',
-            symbol: 'ADA',
-            price: 0.5,
-            change24h: -1.2,
-            marketCap: 20000000000
-          }
-        ]),
-      };
+          body: JSON.stringify({ error: 'Failed to fetch crypto data' }),
+        };
+      }
     }
 
     // Portfolio endpoints
@@ -250,23 +332,42 @@ exports.handler = async (event, context) => {
     }
 
     // Crypto endpoints with more detail
-    if (path.startsWith('/api/crypto/') && method === 'GET') {
+    if (path.startsWith('/api/crypto/') && method === 'GET' && !path.includes('/history')) {
       const cryptoId = path.split('/').pop();
-      return {
-        statusCode: 200,
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: cryptoId,
-          name: 'Bitcoin',
-          symbol: 'BTC',
-          price: 50000,
-          change24h: 2.5,
-          timestamp: new Date().toISOString()
-        }),
-      };
+      try {
+        const cryptoData = await fetchCryptoData();
+        const crypto = cryptoData.find(c => c.id === cryptoId || c.symbol.toLowerCase() === cryptoId.toLowerCase());
+        
+        if (crypto) {
+          return {
+            statusCode: 200,
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(crypto),
+          };
+        } else {
+          return {
+            statusCode: 404,
+            headers: {
+              ...headers,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ error: 'Cryptocurrency not found' }),
+          };
+        }
+      } catch (error) {
+        console.error('Error fetching crypto detail:', error);
+        return {
+          statusCode: 500,
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ error: 'Failed to fetch crypto data' }),
+        };
+      }
     }
 
     if (path.startsWith('/api/crypto/') && path.includes('/history') && method === 'GET') {
