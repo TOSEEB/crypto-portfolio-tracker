@@ -110,6 +110,27 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const updateProfile = async (name, email) => {
+    try {
+      const response = await axios.put('/api/auth/profile', {
+        name,
+        email
+      });
+
+      const { token, user } = response.data;
+      localStorage.setItem('token', token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      setUser(user);
+      
+      toast.success('Profile updated successfully!');
+      return { success: true };
+    } catch (error) {
+      const message = error.response?.data?.message || 'Profile update failed';
+      toast.error(message);
+      return { success: false, error: message };
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
     delete axios.defaults.headers.common['Authorization'];
@@ -122,6 +143,7 @@ export const AuthProvider = ({ children }) => {
     login,
     loginWithToken,
     register,
+    updateProfile,
     logout,
     loading
   };

@@ -636,8 +636,8 @@ exports.handler = async (event, context) => {
             user: {
               id: decoded.userId || 1,
               email: decoded.email || 'user@gmail.com',
-              name: 'Google User',
-              username: 'google_user'
+              name: decoded.name || 'Google User',
+              username: decoded.name ? decoded.name.toLowerCase().replace(/\s+/g, '_') : 'google_user'
             },
             timestamp: new Date().toISOString()
           }),
@@ -706,6 +706,81 @@ exports.handler = async (event, context) => {
       };
     }
 
+    // Profile update endpoint
+    if (path === '/api/auth/profile' && method === 'PUT') {
+      try {
+        const userId = getUserIdFromToken(event);
+        if (!userId) {
+          return {
+            statusCode: 401,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              error: 'Authentication required',
+              timestamp: new Date().toISOString()
+            }),
+          };
+        }
+
+        const body = event.body ? JSON.parse(event.body) : {};
+        const { name, email } = body;
+
+        if (!name) {
+          return {
+            statusCode: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              error: 'Name is required',
+              timestamp: new Date().toISOString()
+            }),
+          };
+        }
+
+        // Update user in database
+        try {
+          const pool = getPool();
+          await pool.query(
+            'UPDATE users SET username = $1, email = $2 WHERE id = $3',
+            [name.toLowerCase().replace(/\s+/g, '_'), email || 'user@gmail.com', userId]
+          );
+        } catch (dbError) {
+          console.log('Database update failed:', dbError.message);
+        }
+
+        // Create new token with updated info
+        const token = Buffer.from(JSON.stringify({
+          userId: userId,
+          email: email || 'user@gmail.com',
+          name: name,
+          exp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+        })).toString('base64');
+
+        return {
+          statusCode: 200,
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: 'Profile updated successfully',
+            token: token,
+            user: {
+              id: userId,
+              name: name,
+              email: email || 'user@gmail.com'
+            },
+            timestamp: new Date().toISOString()
+          }),
+        };
+      } catch (error) {
+        console.error('Profile update error:', error);
+        return {
+          statusCode: 500,
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            error: 'Profile update failed',
+            timestamp: new Date().toISOString()
+          }),
+        };
+      }
+    }
+
     // Google OAuth callback handler
     if (path === '/api/auth/google/callback' && method === 'GET') {
       try {
@@ -724,12 +799,16 @@ exports.handler = async (event, context) => {
         }
 
         // Exchange code for token (simplified - in production, use proper OAuth flow)
+        // For demo purposes, we'll create a user with a generic name
+        // In production, you'd exchange the code for an access token and fetch real user info from Google
+        
         // Generate unique user ID based on timestamp and random number
         const uniqueUserId = Math.floor(Math.random() * 1000000) + Date.now();
         const demoUser = {
           id: uniqueUserId,
           username: 'google_user_' + uniqueUserId,
           email: 'user' + uniqueUserId + '@gmail.com',
+          name: 'Google User',
           google_id: 'google_' + Date.now()
         };
 
@@ -737,6 +816,7 @@ exports.handler = async (event, context) => {
         const token = Buffer.from(JSON.stringify({
           userId: demoUser.id,
           email: demoUser.email,
+          name: demoUser.name,
           exp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
         })).toString('base64');
 

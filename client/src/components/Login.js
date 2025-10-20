@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import ProfileUpdateModal from './ProfileUpdateModal';
 import './Auth.css';
 
 const Login = () => {
@@ -9,6 +10,7 @@ const Login = () => {
     password: ''
   });
   const [loading, setLoading] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const { login, loginWithToken } = useAuth();
   const navigate = useNavigate();
 
@@ -29,7 +31,9 @@ const Login = () => {
             url.searchParams.delete('google');
             url.searchParams.delete('token');
             window.history.replaceState({}, '', url.pathname);
-            navigate('/dashboard');
+            
+            // Show profile update modal for Google users
+            setShowProfileModal(true);
           }
         } catch (err) {
           console.error('Google login failed:', err);
@@ -58,6 +62,11 @@ const Login = () => {
     }
     
     setLoading(false);
+  };
+
+  const handleProfileModalClose = () => {
+    setShowProfileModal(false);
+    navigate('/dashboard');
   };
 
   return (
@@ -144,6 +153,11 @@ const Login = () => {
           </p>
         </div>
       </div>
+      
+      <ProfileUpdateModal 
+        isOpen={showProfileModal} 
+        onClose={handleProfileModalClose} 
+      />
     </div>
   );
 };
