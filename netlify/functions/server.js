@@ -175,11 +175,32 @@ exports.handler = async (event, context) => {
           ...headers,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          message: 'Crypto endpoint working!',
-          cryptos: [],
-          timestamp: new Date().toISOString()
-        }),
+        body: JSON.stringify([
+          {
+            id: 'bitcoin',
+            name: 'Bitcoin',
+            symbol: 'BTC',
+            price: 50000,
+            change24h: 2.5,
+            marketCap: 1000000000000
+          },
+          {
+            id: 'ethereum',
+            name: 'Ethereum',
+            symbol: 'ETH',
+            price: 3000,
+            change24h: 1.8,
+            marketCap: 400000000000
+          },
+          {
+            id: 'cardano',
+            name: 'Cardano',
+            symbol: 'ADA',
+            price: 0.5,
+            change24h: -1.2,
+            marketCap: 20000000000
+          }
+        ]),
       };
     }
 
@@ -191,10 +212,23 @@ exports.handler = async (event, context) => {
           ...headers,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify([]), // Return empty array for portfolio
+      };
+    }
+
+    if (path === '/api/portfolio/summary' && method === 'GET') {
+      return {
+        statusCode: 200,
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          message: 'Portfolio endpoint working!',
-          portfolio: [],
-          timestamp: new Date().toISOString()
+          totalValue: 0,
+          totalInvested: 0,
+          totalProfit: 0,
+          profitPercentage: 0,
+          portfolioCount: 0
         }),
       };
     }
@@ -210,6 +244,44 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({
           message: 'Add to portfolio working!',
           data: body,
+          timestamp: new Date().toISOString()
+        }),
+      };
+    }
+
+    // Crypto endpoints with more detail
+    if (path.startsWith('/api/crypto/') && method === 'GET') {
+      const cryptoId = path.split('/').pop();
+      return {
+        statusCode: 200,
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: cryptoId,
+          name: 'Bitcoin',
+          symbol: 'BTC',
+          price: 50000,
+          change24h: 2.5,
+          timestamp: new Date().toISOString()
+        }),
+      };
+    }
+
+    if (path.startsWith('/api/crypto/') && path.includes('/history') && method === 'GET') {
+      return {
+        statusCode: 200,
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prices: [
+            { date: '2024-01-01', price: 45000 },
+            { date: '2024-01-02', price: 46000 },
+            { date: '2024-01-03', price: 47000 }
+          ],
           timestamp: new Date().toISOString()
         }),
       };
