@@ -233,54 +233,6 @@ const getMockCryptoData = () => {
       market_cap: 16000000000,
       volume_24h: 650000000
     }
-  ];
-
-  try {
-    const apiKey = process.env.COINMARKETCAP_API_KEY;
-    console.log('API Key exists:', !!apiKey);
-    
-    if (!apiKey) {
-      console.log('No CoinMarketCap API key found, using mock data');
-      return mockData;
-    }
-
-    console.log('Attempting to fetch from CoinMarketCap API...');
-    const response = await axios.get('https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest', {
-      headers: {
-        'X-CMC_PRO_API_KEY': apiKey,
-        'Accept': 'application/json'
-      },
-      params: {
-        start: 1,
-        limit: 10,
-        convert: 'USD'
-      },
-      timeout: 10000 // 10 second timeout
-    });
-
-    console.log('API Response status:', response.status);
-    console.log('API Response data length:', response.data.data?.length);
-
-    if (response.data && response.data.data) {
-      return response.data.data.map(crypto => ({
-        id: crypto.slug,
-        name: crypto.name,
-        symbol: crypto.symbol,
-        current_price: crypto.quote.USD.price,
-        price_change_24h: crypto.quote.USD.percent_change_24h,
-        market_cap: crypto.quote.USD.market_cap,
-        volume_24h: crypto.quote.USD.volume_24h
-      }));
-    } else {
-      console.log('Invalid API response structure, using mock data');
-      return mockData;
-    }
-  } catch (error) {
-    console.error('Error fetching crypto data:', error.message);
-    console.error('Error details:', error.response?.data || error.message);
-    console.log('Falling back to mock data');
-    return mockData;
-  }
 };
 
 // Test endpoint
