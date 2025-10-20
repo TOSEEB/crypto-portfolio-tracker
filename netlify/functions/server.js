@@ -962,7 +962,35 @@ exports.handler = async (event, context) => {
     if (path === '/api/portfolio' && method === 'POST') {
       try {
         const body = event.body ? JSON.parse(event.body) : {};
-        const { crypto_id, crypto_name, crypto_symbol, amount, purchase_price } = body;
+        // Normalize incoming payload from UI
+        let incomingSymbol = (body.crypto_symbol || body.symbol || '').toString().trim().toUpperCase();
+        let normalizedAmount = body.amount !== undefined ? parseFloat(body.amount) : NaN;
+        let normalizedPrice = body.purchase_price !== undefined ? parseFloat(body.purchase_price) : NaN;
+
+        // Fetch crypto name if not provided
+        let nameFromApi = null;
+        if (incomingSymbol) {
+          try {
+            const cryptoData = await fetchCryptoData();
+            const found = cryptoData.find(c => c.symbol === incomingSymbol);
+            if (found) nameFromApi = found.name;
+          } catch (_) {}
+        }
+
+        const crypto_symbol = incomingSymbol;
+        const crypto_name = (body.crypto_name || nameFromApi || incomingSymbol).toString();
+        const crypto_id = (body.crypto_id || incomingSymbol.toLowerCase()).toString();
+        const amount = isNaN(normalizedAmount) ? 0 : normalizedAmount;
+        const purchase_price = isNaN(normalizedPrice) ? 0 : normalizedPrice;
+
+        // Basic validation
+        if (!crypto_symbol || amount <= 0 || purchase_price <= 0) {
+          return {
+            statusCode: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: 'Invalid payload: symbol, amount (>0), purchase_price (>0) are required' })
+          };
+        }
         
         console.log('Adding crypto to portfolio:', { crypto_id, crypto_name, crypto_symbol, amount, purchase_price });
         
@@ -975,6 +1003,7 @@ exports.handler = async (event, context) => {
             const { data, error } = await sb
               .from('portfolios')
               .insert({
+                user_id: 1,
                 crypto_id,
                 crypto_name,
                 crypto_symbol,
@@ -1012,8 +1041,8 @@ exports.handler = async (event, context) => {
           }
 
           const result = await pool.query(
-            'INSERT INTO portfolios (crypto_id, crypto_name, crypto_symbol, amount, purchase_price) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [crypto_id, crypto_name, crypto_symbol, amount, purchase_price]
+            'INSERT INTO portfolios (user_id, crypto_id, crypto_name, crypto_symbol, amount, purchase_price) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [1, crypto_id, crypto_name, crypto_symbol, amount, purchase_price]
           );
 
           console.log('Crypto added successfully to PostgreSQL:', result.rows[0]);
