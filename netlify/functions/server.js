@@ -554,7 +554,16 @@ exports.handler = async (event, context) => {
     // Portfolio endpoints
     if (path === '/api/portfolio' && method === 'GET') {
       try {
+        // Check if database is initialized
+        if (!dbInitialized) {
+          console.log('Database not initialized for GET, attempting to initialize...');
+          await initDatabase();
+          dbInitialized = true;
+        }
+        
         const result = await pool.query('SELECT * FROM portfolios ORDER BY created_at DESC');
+        console.log('Portfolio query result:', result.rows.length, 'items');
+        
         const portfolio = result.rows.map(row => ({
           id: row.id,
           crypto_id: row.crypto_id,
@@ -582,6 +591,7 @@ exports.handler = async (event, context) => {
           return item;
         });
 
+        console.log('Returning portfolio with', updatedPortfolio.length, 'items');
         return {
           statusCode: 200,
           headers: {
@@ -592,6 +602,7 @@ exports.handler = async (event, context) => {
         };
       } catch (error) {
         console.error('Error fetching portfolio:', error.message);
+        console.error('Full error:', error);
         return {
           statusCode: 200,
           headers: {
@@ -605,6 +616,13 @@ exports.handler = async (event, context) => {
 
     if (path === '/api/portfolio/summary' && method === 'GET') {
       try {
+        // Check if database is initialized
+        if (!dbInitialized) {
+          console.log('Database not initialized for summary, attempting to initialize...');
+          await initDatabase();
+          dbInitialized = true;
+        }
+        
         const result = await pool.query('SELECT * FROM portfolios');
         const portfolio = result.rows;
         
@@ -626,6 +644,7 @@ exports.handler = async (event, context) => {
         const totalProfit = totalValue - totalInvested;
         const profitPercentage = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
 
+        console.log('Portfolio summary:', { totalInvested, totalValue, portfolioCount: portfolio.length });
         return {
           statusCode: 200,
           headers: {
