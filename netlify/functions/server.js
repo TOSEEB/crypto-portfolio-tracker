@@ -21,91 +21,91 @@ const fetchCryptoData = async () => {
       id: 'bitcoin',
       name: 'Bitcoin',
       symbol: 'BTC',
-      price: 67234.56,
-      change24h: 2.5,
-      marketCap: 1320000000000,
-      volume: 25000000000
+      current_price: 67234.56,
+      price_change_24h: 2.5,
+      market_cap: 1320000000000,
+      volume_24h: 25000000000
     },
     {
       id: 'ethereum',
       name: 'Ethereum',
       symbol: 'ETH',
-      price: 3456.78,
-      change24h: 1.8,
-      marketCap: 415000000000,
-      volume: 15000000000
+      current_price: 3456.78,
+      price_change_24h: 1.8,
+      market_cap: 415000000000,
+      volume_24h: 15000000000
     },
     {
       id: 'tether',
       name: 'Tether USDt',
       symbol: 'USDT',
-      price: 1.00,
-      change24h: 0.01,
-      marketCap: 95000000000,
-      volume: 35000000000
+      current_price: 1.00,
+      price_change_24h: 0.01,
+      market_cap: 95000000000,
+      volume_24h: 35000000000
     },
     {
       id: 'bnb',
       name: 'BNB',
       symbol: 'BNB',
-      price: 567.89,
-      change24h: -0.5,
-      marketCap: 85000000000,
-      volume: 1200000000
+      current_price: 567.89,
+      price_change_24h: -0.5,
+      market_cap: 85000000000,
+      volume_24h: 1200000000
     },
     {
       id: 'xrp',
       name: 'XRP',
       symbol: 'XRP',
-      price: 0.6234,
-      change24h: 3.2,
-      marketCap: 35000000000,
-      volume: 2800000000
+      current_price: 0.6234,
+      price_change_24h: 3.2,
+      market_cap: 35000000000,
+      volume_24h: 2800000000
     },
     {
       id: 'solana',
       name: 'Solana',
       symbol: 'SOL',
-      price: 98.45,
-      change24h: 5.7,
-      marketCap: 42000000000,
-      volume: 1800000000
+      current_price: 98.45,
+      price_change_24h: 5.7,
+      market_cap: 42000000000,
+      volume_24h: 1800000000
     },
     {
       id: 'usd-coin',
       name: 'USDC',
       symbol: 'USDC',
-      price: 1.00,
-      change24h: 0.01,
-      marketCap: 32000000000,
-      volume: 4500000000
+      current_price: 1.00,
+      price_change_24h: 0.01,
+      market_cap: 32000000000,
+      volume_24h: 4500000000
     },
     {
       id: 'tron',
       name: 'TRON',
       symbol: 'TRX',
-      price: 0.1234,
-      change24h: 1.5,
-      marketCap: 11000000000,
-      volume: 850000000
+      current_price: 0.1234,
+      price_change_24h: 1.5,
+      market_cap: 11000000000,
+      volume_24h: 850000000
     },
     {
       id: 'dogecoin',
       name: 'Dogecoin',
       symbol: 'DOGE',
-      price: 0.0892,
-      change24h: -2.1,
-      marketCap: 12800000000,
-      volume: 1200000000
+      current_price: 0.0892,
+      price_change_24h: -2.1,
+      market_cap: 12800000000,
+      volume_24h: 1200000000
     },
     {
       id: 'cardano',
       name: 'Cardano',
       symbol: 'ADA',
-      price: 0.4567,
-      change24h: -1.2,
-      marketCap: 16000000000,
-      volume: 650000000
+      current_price: 0.4567,
+      price_change_24h: -1.2,
+      market_cap: 16000000000,
+      volume_24h: 650000000
     }
   ];
 
@@ -140,10 +140,10 @@ const fetchCryptoData = async () => {
         id: crypto.slug,
         name: crypto.name,
         symbol: crypto.symbol,
-        price: crypto.quote.USD.price,
-        change24h: crypto.quote.USD.percent_change_24h,
-        marketCap: crypto.quote.USD.market_cap,
-        volume: crypto.quote.USD.volume_24h
+        current_price: crypto.quote.USD.price,
+        price_change_24h: crypto.quote.USD.percent_change_24h,
+        market_cap: crypto.quote.USD.market_cap,
+        volume_24h: crypto.quote.USD.volume_24h
       }));
     } else {
       console.log('Invalid API response structure, using mock data');
