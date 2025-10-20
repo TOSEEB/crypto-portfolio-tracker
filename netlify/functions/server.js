@@ -913,34 +913,44 @@ exports.handler = async (event, context) => {
 
     if (path === '/api/portfolio/summary' && method === 'GET') {
       try {
-        // Check if database is initialized
-        if (!dbInitialized) {
-          console.log('Database not initialized for summary, attempting to initialize...');
-          initDatabase().then(() => {
-            dbInitialized = true;
-          }).catch(err => {
-            console.error('Database initialization failed:', err);
-          });
+        // Prefer Supabase, then Postgres, then memory
+        let portfolio = [];
+        const sb = getSupabase();
+        if (sb) {
+          const { data, error } = await sb.from('portfolios').select('*');
+          if (error) throw error;
+          portfolio = data;
+        } else {
+          if (!dbInitialized) {
+            console.log('Database not initialized for summary, attempting to initialize...');
+            initDatabase().then(() => { dbInitialized = true; }).catch(err => console.error('DB init failed:', err));
+          }
+          try {
+            const result = await pool.query('SELECT * FROM portfolios');
+            portfolio = result.rows;
+          } catch (e) {
+            console.log('Postgres summary failed, using in-memory:', e.message);
+            portfolio = portfolioStorage;
+          }
         }
-        
-        const result = await pool.query('SELECT * FROM portfolios');
-        const portfolio = result.rows;
-        
+
         let totalInvested = 0;
         let totalValue = 0;
-        
+
         const cryptoData = await fetchCryptoData();
-        
+
         portfolio.forEach(item => {
-          const currentCrypto = cryptoData.find(c => c.symbol === item.crypto_symbol);
-          const invested = parseFloat(item.amount) * parseFloat(item.purchase_price);
-          totalInvested += invested;
-          
-          if (currentCrypto) {
-            totalValue += parseFloat(item.amount) * currentCrypto.current_price;
+          const amount = parseFloat(item.amount);
+          const purchasePrice = parseFloat(item.purchase_price);
+          if (!isNaN(amount) && !isNaN(purchasePrice)) {
+            totalInvested += amount * purchasePrice;
+          }
+          const currentCrypto = cryptoData.find(c => c.symbol === (item.crypto_symbol || item.symbol));
+          if (currentCrypto && !isNaN(amount)) {
+            totalValue += amount * currentCrypto.current_price;
           }
         });
-        
+
         const totalProfit = totalValue - totalInvested;
         const profitPercentage = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
 
@@ -952,10 +962,10 @@ exports.handler = async (event, context) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            totalValue: totalValue,
-            totalInvested: totalInvested,
-            totalProfit: totalProfit,
-            profitPercentage: profitPercentage,
+            totalValue,
+            totalInvested,
+            totalProfit,
+            profitPercentage,
             portfolioCount: portfolio.length
           }),
         };
