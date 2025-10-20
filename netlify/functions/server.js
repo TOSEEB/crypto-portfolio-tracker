@@ -616,6 +616,52 @@ exports.handler = async (event, context) => {
       }
     }
 
+    // Debug endpoint for database
+    if (path === '/api/debug-db' && method === 'GET') {
+      try {
+        console.log('Testing database connection...');
+        const testResult = await pool.query('SELECT 1 as test');
+        const tableCheck = await pool.query(`
+          SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name = 'portfolios'
+          );
+        `);
+        
+        let portfolioCount = 0;
+        if (tableCheck.rows[0].exists) {
+          const countResult = await pool.query('SELECT COUNT(*) FROM portfolios');
+          portfolioCount = parseInt(countResult.rows[0].count);
+        }
+        
+        return {
+          statusCode: 200,
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: 'Database test successful',
+            dbInitialized,
+            tableExists: tableCheck.rows[0].exists,
+            portfolioCount,
+            timestamp: new Date().toISOString()
+          }),
+        };
+      } catch (error) {
+        console.error('Database test failed:', error.message);
+        return {
+          statusCode: 200,
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: 'Database test failed',
+            error: error.message,
+            code: error.code,
+            detail: error.detail,
+            timestamp: new Date().toISOString()
+          }),
+        };
+      }
+    }
+
     // Portfolio endpoints
     if (path === '/api/portfolio' && method === 'GET') {
       try {
@@ -744,6 +790,12 @@ exports.handler = async (event, context) => {
         
         console.log('Adding crypto to portfolio:', { crypto_id, crypto_name, crypto_symbol, amount, purchase_price });
         
+        // Ensure database is initialized first
+        if (!dbInitialized) {
+          console.log('Database not initialized, initializing now...');
+          await initDatabase();
+        }
+        
         const result = await pool.query(
           'INSERT INTO portfolios (crypto_id, crypto_name, crypto_symbol, amount, purchase_price) VALUES ($1, $2, $3, $4, $5) RETURNING *',
           [crypto_id, crypto_name, crypto_symbol, amount, purchase_price]
@@ -766,6 +818,9 @@ exports.handler = async (event, context) => {
       } catch (error) {
         console.error('Error adding to portfolio:', error.message);
         console.error('Full error:', error);
+        console.error('Error code:', error.code);
+        console.error('Error detail:', error.detail);
+        
         return {
           statusCode: 500,
           headers: {
@@ -774,7 +829,9 @@ exports.handler = async (event, context) => {
           },
           body: JSON.stringify({ 
             error: 'Failed to add crypto to portfolio',
-            details: error.message 
+            details: error.message,
+            code: error.code,
+            timestamp: new Date().toISOString()
           }),
         };
       }
