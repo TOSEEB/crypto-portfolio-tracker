@@ -933,11 +933,11 @@ exports.handler = async (event, context) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            totalValue,
-            totalInvested,
-            totalProfit,
-            profitPercentage,
-            portfolioCount: portfolio.length
+            total_holdings: portfolio.length,
+            total_invested: totalInvested,
+            total_current_value: totalValue,
+            total_profit_loss: totalProfit,
+            total_profit_loss_percentage: profitPercentage
           }),
         };
       } catch (error) {
@@ -949,11 +949,11 @@ exports.handler = async (event, context) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            totalValue: 0,
-            totalInvested: 0,
-            totalProfit: 0,
-            profitPercentage: 0,
-            portfolioCount: 0
+            total_holdings: 0,
+            total_invested: 0,
+            total_current_value: 0,
+            total_profit_loss: 0,
+            total_profit_loss_percentage: 0
           }),
         };
       }
