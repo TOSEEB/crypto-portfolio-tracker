@@ -7,11 +7,7 @@ const app = express();
 
 // Database connection with proper Supabase format
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  connectionString: process.env.DATABASE_URL || `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`,
   ssl: {
     rejectUnauthorized: false
   },
@@ -26,10 +22,19 @@ let portfolioStorage = [];
 // Check if database is working
 const isDatabaseWorking = async () => {
   try {
+    console.log('Testing database connection...');
+    console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+    console.log('DB_HOST:', process.env.DB_HOST);
+    console.log('DB_USER:', process.env.DB_USER);
+    console.log('DB_NAME:', process.env.DB_NAME);
+    
     await pool.query('SELECT 1');
+    console.log('Database connection successful');
     return true;
   } catch (error) {
-    console.log('Database not working, using in-memory storage:', error.message);
+    console.log('Database not working:', error.message);
+    console.log('Error code:', error.code);
+    console.log('Error details:', error);
     return false;
   }
 };
