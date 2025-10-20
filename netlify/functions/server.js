@@ -632,13 +632,33 @@ exports.handler = async (event, context) => {
     }
 
     if (path === '/api/auth/google' && method === 'GET') {
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      const serverUrl = process.env.SERVER_URL || process.env.CLIENT_URL;
+      const redirectUri = encodeURIComponent(`${serverUrl}/api/auth/google/callback`);
+      const scope = encodeURIComponent('openid email profile');
+      const location = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&include_granted_scopes=true&prompt=consent`;
+
       return {
         statusCode: 302,
         headers: {
           ...headers,
-          'Location': 'https://accounts.google.com/oauth/authorize?client_id=' + process.env.GOOGLE_CLIENT_ID + '&redirect_uri=' + encodeURIComponent(process.env.CLIENT_URL + '/auth/callback') + '&scope=email profile&response_type=code'
+          'Location': location
         },
         body: '',
+      };
+    }
+
+    // Minimal Google OAuth callback handler
+    if (path === '/api/auth/google/callback' && method === 'GET') {
+      const clientUrl = process.env.CLIENT_URL || '/';
+      const qs = (event.queryStringParameters && event.queryStringParameters.code) ? 'google=success' : 'google=error';
+      return {
+        statusCode: 302,
+        headers: {
+          ...headers,
+          'Location': `${clientUrl}/login?${qs}`
+        },
+        body: ''
       };
     }
 
