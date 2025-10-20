@@ -732,6 +732,9 @@ exports.handler = async (event, context) => {
               item.profit_percentage = ((item.current_value - (item.amount * item.purchase_price)) / (item.amount * item.purchase_price)) * 100;
               item.profit_loss_percentage = item.profit_percentage; // Add this for frontend compatibility
             }
+            // Add aliases expected by frontend
+            item.symbol = item.crypto_symbol;
+            item.name = item.crypto_name;
             return item;
           });
           
@@ -756,6 +759,9 @@ exports.handler = async (event, context) => {
             crypto_id: row.crypto_id,
             crypto_name: row.crypto_name,
             crypto_symbol: row.crypto_symbol,
+            // Frontend aliases
+            name: row.crypto_name,
+            symbol: row.crypto_symbol,
             amount: parseFloat(row.amount),
             purchase_price: parseFloat(row.purchase_price),
             purchase_date: row.purchase_date,
@@ -776,6 +782,9 @@ exports.handler = async (event, context) => {
               item.profit_percentage = ((item.current_value - (item.amount * item.purchase_price)) / (item.amount * item.purchase_price)) * 100;
               item.profit_loss_percentage = item.profit_percentage; // Add this for frontend compatibility
             }
+            // Ensure aliases present
+            item.symbol = item.crypto_symbol;
+            item.name = item.crypto_name;
             return item;
           });
 
@@ -802,6 +811,9 @@ exports.handler = async (event, context) => {
               item.profit_percentage = ((item.current_value - (item.amount * item.purchase_price)) / (item.amount * item.purchase_price)) * 100;
               item.profit_loss_percentage = item.profit_percentage; // Add this for frontend compatibility
             }
+            // Add aliases expected by frontend
+            item.symbol = item.crypto_symbol;
+            item.name = item.crypto_name;
             return item;
           });
 
