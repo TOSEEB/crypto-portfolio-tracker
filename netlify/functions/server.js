@@ -799,16 +799,34 @@ exports.handler = async (event, context) => {
         }
 
         // Exchange code for token (simplified - in production, use proper OAuth flow)
-        // For demo purposes, we'll create a user with a generic name
+        // For demo purposes, we'll create a user with a name derived from email
         // In production, you'd exchange the code for an access token and fetch real user info from Google
         
         // Generate unique user ID based on timestamp and random number
         const uniqueUserId = Math.floor(Math.random() * 1000000) + Date.now();
+        
+        // Create a more realistic email and name for demo
+        const demoEmail = 'chrishemsworth776655@gmail.com'; // Example email
+        const emailPrefix = demoEmail.split('@')[0];
+        
+        // Convert email prefix to a readable name
+        let name = emailPrefix
+          .replace(/[._-]/g, ' ')
+          .replace(/([a-z])([A-Z])/g, '$1 $2') // Add space before capital letters
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join(' ');
+        
+        // If the name is too long or contains numbers, use a simpler approach
+        if (name.length > 20 || /\d/.test(name)) {
+          name = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1).toLowerCase();
+        }
+        
         const demoUser = {
           id: uniqueUserId,
-          username: 'google_user_' + uniqueUserId,
-          email: 'user' + uniqueUserId + '@gmail.com',
-          name: 'Google User',
+          username: name.toLowerCase().replace(/\s+/g, '_') + '_' + uniqueUserId,
+          email: demoEmail,
+          name: name,
           google_id: 'google_' + Date.now()
         };
 

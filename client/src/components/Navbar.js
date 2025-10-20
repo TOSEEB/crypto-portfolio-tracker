@@ -23,7 +23,7 @@ const Navbar = () => {
           
           <div className="navbar-menu">
             {user ? (
-              <>
+              <> 
                 <Link to="/dashboard" className="navbar-link">
                   Dashboard
                 </Link>
@@ -37,7 +37,7 @@ const Navbar = () => {
                   Add Crypto
                 </Link>
                 <div className="navbar-user">
-                  <span className="user-name">Welcome, {user.username}</span>
+                  <span className="user-name">Welcome, {user.name || user.username}</span>
                   <button onClick={handleLogout} className="btn btn-sm btn-secondary">
                     Logout
                   </button>
