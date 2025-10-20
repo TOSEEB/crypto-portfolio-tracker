@@ -51,8 +51,9 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     try {
+      // Backend expects { email, password }. Map username -> email to support current UI.
       const response = await axios.post('/api/auth/login', {
-        username,
+        email: username,
         password
       });
 
