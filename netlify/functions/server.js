@@ -5,38 +5,26 @@ const { Pool } = require('pg');
 
 const app = express();
 
-// Database connection with Supabase direct connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`,
-  ssl: {
-    rejectUnauthorized: false
-  },
-  connectionTimeoutMillis: 10000,
-  idleTimeoutMillis: 30000,
-  max: 20
-});
+// Database connection - initialize only when needed
+let pool = null;
+let dbInitialized = false;
 
 // Simple in-memory storage as fallback
 let portfolioStorage = [];
 
-// Check if database is working
-const isDatabaseWorking = async () => {
-  try {
-    console.log('Testing database connection...');
-    console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
-    console.log('DB_HOST:', process.env.DB_HOST);
-    console.log('DB_USER:', process.env.DB_USER);
-    console.log('DB_NAME:', process.env.DB_NAME);
-    
-    await pool.query('SELECT 1');
-    console.log('Database connection successful');
-    return true;
-  } catch (error) {
-    console.log('Database not working:', error.message);
-    console.log('Error code:', error.code);
-    console.log('Error details:', error);
-    return false;
+const getPool = () => {
+  if (!pool) {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL || `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`,
+      ssl: {
+        rejectUnauthorized: false
+      },
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 30000,
+      max: 20
+    });
   }
+  return pool;
 };
 
 // Initialize database tables
@@ -47,6 +35,7 @@ const initDatabase = async () => {
     console.log('DB Name:', process.env.DB_NAME);
     console.log('DB User:', process.env.DB_USER);
     
+const pool = getPool();
     await pool.query(`
       CREATE TABLE IF NOT EXISTS portfolios (
         id SERIAL PRIMARY KEY,
@@ -419,7 +408,8 @@ exports.handler = async (event, context) => {
         const connectionTest = await pool.query('SELECT NOW() as current_time');
         
         // Test table creation
-        await pool.query(`
+    const pool = getPool();
+    await pool.query(`
           CREATE TABLE IF NOT EXISTS portfolios (
             id SERIAL PRIMARY KEY,
             user_id INTEGER DEFAULT 1,
@@ -629,6 +619,7 @@ exports.handler = async (event, context) => {
         console.log('DB_USER:', process.env.DB_USER);
         console.log('DB_NAME:', process.env.DB_NAME);
         
+        const pool = getPool();
         const testResult = await pool.query('SELECT 1 as test');
         const tableCheck = await pool.query(`
           SELECT EXISTS (
