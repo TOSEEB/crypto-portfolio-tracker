@@ -233,6 +233,9 @@ const getMockCryptoData = () => {
       market_cap: 16000000000,
       volume_24h: 650000000
     }
+  ];
+  
+  return mockData;
 };
 
 // Test endpoint
