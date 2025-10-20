@@ -20,6 +20,11 @@ const pool = new Pool({
 // Initialize database tables
 const initDatabase = async () => {
   try {
+    console.log('Starting database initialization...');
+    console.log('DB Host:', process.env.DB_HOST);
+    console.log('DB Name:', process.env.DB_NAME);
+    console.log('DB User:', process.env.DB_USER);
+    
     await pool.query(`
       CREATE TABLE IF NOT EXISTS portfolios (
         id SERIAL PRIMARY KEY,
@@ -33,9 +38,16 @@ const initDatabase = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('Database tables initialized successfully');
+    
+    // Test the table by inserting a dummy record and then deleting it
+    const testResult = await pool.query('SELECT COUNT(*) as count FROM portfolios');
+    console.log('Database tables initialized successfully. Current portfolio count:', testResult.rows[0].count);
+    
+    return true;
   } catch (error) {
     console.error('Database initialization error:', error.message);
+    console.error('Full error:', error);
+    return false;
   }
 };
 
@@ -376,10 +388,39 @@ exports.handler = async (event, context) => {
       }
     }
 
-    // Debug database endpoint
-    if (path === '/api/debug-db' && method === 'GET') {
+    // Test database endpoint
+    if (path === '/api/test-db' && method === 'GET') {
       try {
-        const result = await pool.query('SELECT COUNT(*) as count FROM portfolios');
+        // Test basic connection
+        const connectionTest = await pool.query('SELECT NOW() as current_time');
+        
+        // Test table creation
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS portfolios (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER DEFAULT 1,
+            crypto_id VARCHAR(50) NOT NULL,
+            crypto_name VARCHAR(100) NOT NULL,
+            crypto_symbol VARCHAR(10) NOT NULL,
+            amount DECIMAL(20, 8) NOT NULL,
+            purchase_price DECIMAL(20, 8) NOT NULL,
+            purchase_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        
+        // Test insert
+        const insertResult = await pool.query(
+          'INSERT INTO portfolios (crypto_id, crypto_name, crypto_symbol, amount, purchase_price) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+          ['test-bitcoin', 'Test Bitcoin', 'BTC', 0.1, 50000]
+        );
+        
+        // Test select
+        const selectResult = await pool.query('SELECT * FROM portfolios WHERE crypto_id = $1', ['test-bitcoin']);
+        
+        // Clean up test data
+        await pool.query('DELETE FROM portfolios WHERE crypto_id = $1', ['test-bitcoin']);
+        
         return {
           statusCode: 200,
           headers: {
@@ -387,10 +428,12 @@ exports.handler = async (event, context) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            message: 'Database connection successful',
-            portfolioCount: result.rows[0].count,
-            dbInitialized: dbInitialized,
+            message: 'Database test successful',
+            connectionTime: connectionTest.rows[0].current_time,
+            insertResult: insertResult.rows[0],
+            selectResult: selectResult.rows[0],
             dbHost: process.env.DB_HOST,
+            dbName: process.env.DB_NAME,
             timestamp: new Date().toISOString()
           }),
         };
@@ -402,10 +445,10 @@ exports.handler = async (event, context) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            message: 'Database connection failed',
+            message: 'Database test failed',
             error: error.message,
-            dbInitialized: dbInitialized,
             dbHost: process.env.DB_HOST,
+            dbName: process.env.DB_NAME,
             timestamp: new Date().toISOString()
           }),
         };
@@ -750,7 +793,7 @@ exports.handler = async (event, context) => {
             },
             body: JSON.stringify(crypto),
           };
-        } else {
+      } else {
           return {
             statusCode: 404,
             headers: {
