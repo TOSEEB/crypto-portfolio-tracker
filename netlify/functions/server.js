@@ -620,6 +620,13 @@ exports.handler = async (event, context) => {
     if (path === '/api/debug-db' && method === 'GET') {
       try {
         console.log('Testing database connection...');
+        console.log('Environment variables:');
+        console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+        console.log('DB_HOST:', process.env.DB_HOST);
+        console.log('DB_PORT:', process.env.DB_PORT);
+        console.log('DB_USER:', process.env.DB_USER);
+        console.log('DB_NAME:', process.env.DB_NAME);
+        
         const testResult = await pool.query('SELECT 1 as test');
         const tableCheck = await pool.query(`
           SELECT EXISTS (
@@ -643,6 +650,13 @@ exports.handler = async (event, context) => {
             dbInitialized,
             tableExists: tableCheck.rows[0].exists,
             portfolioCount,
+            envVars: {
+              databaseUrl: !!process.env.DATABASE_URL,
+              dbHost: process.env.DB_HOST,
+              dbPort: process.env.DB_PORT,
+              dbUser: process.env.DB_USER,
+              dbName: process.env.DB_NAME
+            },
             timestamp: new Date().toISOString()
           }),
         };
@@ -656,6 +670,13 @@ exports.handler = async (event, context) => {
             error: error.message,
             code: error.code,
             detail: error.detail,
+            envVars: {
+              databaseUrl: !!process.env.DATABASE_URL,
+              dbHost: process.env.DB_HOST,
+              dbPort: process.env.DB_PORT,
+              dbUser: process.env.DB_USER,
+              dbName: process.env.DB_NAME
+            },
             timestamp: new Date().toISOString()
           }),
         };
