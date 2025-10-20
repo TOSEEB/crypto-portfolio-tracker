@@ -11,8 +11,7 @@ let pool = null;
 let dbInitialized = false;
 let supabase = null;
 
-// Simple in-memory storage as fallback
-let portfolioStorage = [];
+// Disable in-memory storage: always use database (Supabase/Postgres)
 let useInMemoryStorage = false;
 
 const getPool = () => {
@@ -94,8 +93,8 @@ initDatabase().then(() => {
 }).catch((error) => {
   console.error('Database initialization failed:', error.message);
   dbInitialized = false;
-  useInMemoryStorage = true;
-  console.log('Falling back to in-memory storage');
+  useInMemoryStorage = false;
+  console.log('Database unavailable; in-memory storage disabled per requirements');
 });
 
 // CORS for all origins
@@ -741,35 +740,7 @@ exports.handler = async (event, context) => {
       try {
         console.log('Fetching portfolio...');
         
-        // Use appropriate storage method
-        if (useInMemoryStorage) {
-          console.log('Using in-memory storage, portfolio items:', portfolioStorage.length);
-          const cryptoData = await fetchCryptoData();
-          const updatedPortfolio = portfolioStorage.map(item => {
-            // Get current prices for portfolio items
-            const currentCrypto = cryptoData.find(c => c.symbol === item.crypto_symbol);
-            if (currentCrypto) {
-              item.current_price = currentCrypto.current_price;
-              item.current_value = item.amount * currentCrypto.current_price;
-              item.profit_loss = item.current_value - (item.amount * item.purchase_price);
-              item.profit_percentage = ((item.current_value - (item.amount * item.purchase_price)) / (item.amount * item.purchase_price)) * 100;
-              item.profit_loss_percentage = item.profit_percentage; // Add this for frontend compatibility
-            }
-            // Add aliases expected by frontend
-            item.symbol = item.crypto_symbol;
-            item.name = item.crypto_name;
-            return item;
-          });
-          
-          return {
-            statusCode: 200,
-            headers: {
-              ...headers,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(updatedPortfolio),
-          };
-        }
+        // Memory disabled; always use database
         
         // Try Supabase first, then Postgres
         try {
@@ -995,37 +966,7 @@ exports.handler = async (event, context) => {
         
         console.log('Adding crypto to portfolio:', { crypto_id, crypto_name, crypto_symbol, amount, purchase_price });
         
-        // Use appropriate storage method
-        if (useInMemoryStorage) {
-          console.log('Using in-memory storage for adding crypto');
-          const newItem = {
-            id: Date.now(),
-            crypto_id,
-            crypto_name,
-            crypto_symbol,
-            amount: parseFloat(amount),
-            purchase_price: parseFloat(purchase_price),
-            purchase_date: new Date().toISOString(),
-            created_at: new Date().toISOString()
-          };
-          
-          portfolioStorage.push(newItem);
-          console.log('Crypto added to in-memory storage:', newItem);
-          
-          return {
-            statusCode: 201,
-            headers: {
-              ...headers,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              message: 'Crypto added to portfolio successfully',
-              data: newItem,
-              storage: 'in-memory',
-              timestamp: new Date().toISOString()
-            }),
-          };
-        }
+        // Memory disabled; always use database
         
         // Try Supabase first, then Postgres
         try {
@@ -1091,34 +1032,11 @@ exports.handler = async (event, context) => {
             }),
           };
         } catch (dbError) {
-          console.log('Database failed, using in-memory storage:', dbError.message);
-          
-          // Fallback to in-memory storage
-          const newItem = {
-            id: Date.now(),
-            crypto_id,
-            crypto_name,
-            crypto_symbol,
-            amount: parseFloat(amount),
-            purchase_price: parseFloat(purchase_price),
-            purchase_date: new Date().toISOString(),
-            created_at: new Date().toISOString()
-          };
-          
-          portfolioStorage.push(newItem);
-          console.log('Added to in-memory storage:', newItem);
-          
+          console.error('Database error (no fallback):', dbError.message);
           return {
-            statusCode: 201,
-            headers: {
-              ...headers,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              message: 'Crypto added to portfolio successfully (temporary storage)',
-              data: newItem,
-              timestamp: new Date().toISOString()
-            }),
+            statusCode: 500,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ error: 'Database unavailable' })
           };
         }
       } catch (error) {
