@@ -38,6 +38,11 @@ const Navbar = () => {
                 </Link>
                 <div className="navbar-user">
                   <span className="user-name">Welcome, {user.name || user.username}</span>
+                  {process.env.NODE_ENV === 'development' && user.email && (
+                    <span style={{ fontSize: '12px', color: '#666', marginLeft: '10px' }}>
+                      ({user.email})
+                    </span>
+                  )}
                   <button onClick={handleLogout} className="btn btn-sm btn-secondary">
                     Logout
                   </button>

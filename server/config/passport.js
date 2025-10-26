@@ -55,8 +55,16 @@ passport.use(new GoogleStrategy({
       return done(null, updatedUser.rows[0]);
     }
 
-    // Generate a unique username if displayName already exists
-    let username = profile.displayName.replace(/\s+/g, '_').toLowerCase();
+    // Generate a username from email (more reliable than displayName)
+    // Extract the part before @ from email (e.g., toseebbeg02@gmail.com -> toseebbeg02)
+    const emailPrefix = profile.emails[0].value.split('@')[0];
+    let username = emailPrefix.replace(/[^a-z0-9_]/gi, '').toLowerCase();
+    
+    // Fallback to displayName if email prefix is invalid
+    if (!username || username.length < 3) {
+      username = profile.displayName.replace(/\s+/g, '_').toLowerCase().substring(0, 20);
+    }
+    
     let usernameAttempts = 0;
     let finalUsername = username;
     
@@ -75,7 +83,7 @@ passport.use(new GoogleStrategy({
       
       if (usernameAttempts > 100) {
         // Fallback to timestamp-based username
-        finalUsername = `${username}_${Date.now()}`;
+        finalUsername = `user_${Date.now()}`;
         break;
       }
     }
