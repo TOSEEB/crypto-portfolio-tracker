@@ -145,8 +145,16 @@ router.post('/login', async (req, res) => {
 // Get current user
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    // Extract display name from email (e.g., toseebbeg02@gmail.com -> toseebbeg02)
+    // Always use email prefix for display name to ensure consistency
+    // This prevents showing old/wrong usernames from database
     const displayName = req.user.email ? req.user.email.split('@')[0] : req.user.username;
+    
+    console.log('Current user:', { 
+      id: req.user.id, 
+      email: req.user.email, 
+      dbUsername: req.user.username,
+      displayName 
+    });
     
     res.json({
       user: {

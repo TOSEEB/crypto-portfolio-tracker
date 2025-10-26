@@ -35,7 +35,12 @@ const authenticateToken = async (req, res, next) => {
     }
 
     console.log('User authenticated:', { userId: result.rows[0].id, username: result.rows[0].username, email: result.rows[0].email });
-    req.user = result.rows[0];
+    // Use email from token if available (more recent), otherwise use DB email
+    req.user = {
+      ...result.rows[0],
+      email: decoded.email || result.rows[0].email,
+      username: decoded.username || result.rows[0].username
+    };
     next();
   } catch (err) {
     console.error('Token verification error:', err.message);

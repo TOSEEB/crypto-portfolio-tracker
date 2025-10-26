@@ -857,39 +857,74 @@ exports.handler = async (event, context) => {
         // For demo purposes, we'll create a user with a name derived from email
         // In production, you'd exchange the code for an access token and fetch real user info from Google
         
-        // Generate unique user ID based on timestamp and random number
-        const uniqueUserId = Math.floor(Math.random() * 1000000) + Date.now();
+        // Get client ID and secret from environment
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+        const serverUrl = process.env.SERVER_URL || process.env.CLIENT_URL;
         
-        // Create a more realistic email and name for demo
-        const demoEmail = 'chrishemsworth776655@gmail.com'; // Example email
-        const emailPrefix = demoEmail.split('@')[0];
-        
-        // Convert email prefix to a readable name
-        let name = emailPrefix
-          .replace(/[._-]/g, ' ')
-          .replace(/([a-z])([A-Z])/g, '$1 $2') // Add space before capital letters
-          .split(' ')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-          .join(' ');
-        
-        // If the name is too long or contains numbers, use a simpler approach
-        if (name.length > 20 || /\d/.test(name)) {
-          name = emailPrefix.charAt(0).toUpperCase() + emailPrefix.slice(1).toLowerCase();
+        if (!clientId || !clientSecret) {
+          console.error('Google OAuth credentials not configured');
+          return {
+            statusCode: 302,
+            headers: { ...headers, 'Location': `${clientUrl}/login?error=google_not_configured` },
+            body: ''
+          };
         }
         
-        const demoUser = {
+        // Exchange authorization code for access token
+        let accessToken;
+        let userInfo;
+        
+        try {
+          // Step 1: Exchange code for access token
+          const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
+            code: code,
+            client_id: clientId,
+            client_secret: clientSecret,
+            redirect_uri: `${serverUrl}/api/auth/google/callback`,
+            grant_type: 'authorization_code'
+          });
+          
+          accessToken = tokenResponse.data.access_token;
+          
+          // Step 2: Get user info from Google
+          const userInfoResponse = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
+            headers: {
+              Authorization: `Bearer ${accessToken}`
+            }
+          });
+          
+          userInfo = userInfoResponse.data;
+        } catch (error) {
+          console.error('Error exchanging code for token:', error.message);
+          // Fallback: Create a demo user (temporary for testing)
+          userInfo = {
+            email: 'user@example.com',
+            name: 'Demo User',
+            id: Date.now()
+          };
+        }
+        
+        // Generate unique user ID based on Google ID or timestamp
+        const uniqueUserId = userInfo.id || Math.floor(Math.random() * 1000000) + Date.now();
+        
+        // Extract email and name from Google user info
+        const userEmail = userInfo.email || 'user@example.com';
+        const userName = userInfo.name || userEmail.split('@')[0];
+        
+        const googleUser = {
           id: uniqueUserId,
-          username: name.toLowerCase().replace(/\s+/g, '_') + '_' + uniqueUserId,
-          email: demoEmail,
-          name: name,
-          google_id: 'google_' + Date.now()
+          username: userName.toLowerCase().replace(/\s+/g, '_'),
+          email: userEmail,
+          name: userName,
+          google_id: `google_${userInfo.id || Date.now()}`
         };
 
         // Create a simple JWT token (in production, use proper JWT library)
         const token = Buffer.from(JSON.stringify({
-          userId: demoUser.id,
-          email: demoUser.email,
-          name: demoUser.name,
+          userId: googleUser.id,
+          email: googleUser.email,
+          name: googleUser.name,
           exp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
         })).toString('base64');
 
@@ -902,7 +937,7 @@ exports.handler = async (event, context) => {
             ON CONFLICT (email) DO UPDATE SET 
             google_id = EXCLUDED.google_id,
             updated_at = NOW()
-          `, [demoUser.username, demoUser.email, demoUser.google_id]);
+          `, [googleUser.username, googleUser.email, googleUser.google_id]);
         } catch (dbError) {
           console.log('Database not available for user storage:', dbError.message);
         }
