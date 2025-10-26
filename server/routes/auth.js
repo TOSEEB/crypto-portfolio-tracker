@@ -151,7 +151,7 @@ router.get('/me', authenticateToken, async (req, res) => {
     res.json({
       user: {
         id: req.user.id,
-        username: req.user.username,
+        username: displayName,
         email: req.user.email,
         name: displayName
       }
