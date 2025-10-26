@@ -253,12 +253,22 @@ router.get('/google/callback',
     try {
       const user = req.user;
       
+      console.log('Google OAuth callback: User authenticated', { 
+        userId: user.id, 
+        username: user.username, 
+        email: user.email,
+        google_id: user.google_id 
+      });
+      
       // Generate JWT token
+      const jwtSecret = process.env.JWT_SECRET || 'development_secret_key_12345';
       const token = jwt.sign(
         { userId: user.id, username: user.username },
-        process.env.JWT_SECRET,
+        jwtSecret,
         { expiresIn: '7d' }
       );
+
+      console.log('Google OAuth callback: JWT token generated for user ID:', user.id);
 
       // Redirect to frontend with token
       const frontendUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth/callback?token=${token}`;

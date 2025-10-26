@@ -1,13 +1,34 @@
 const { Pool } = require('pg');
 
-const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'crypto_tracker',
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'password',
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+// Use connection string if available (for Supabase/Vercel Postgres)
+let poolConfig;
+if (process.env.DATABASE_URL) {
+  console.log('Using DATABASE_URL connection string');
+  poolConfig = {
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false
+    }
+  };
+} else {
+  console.log('Using individual database config parameters');
+  poolConfig = {
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 5432,
+    database: process.env.DB_NAME || 'crypto_tracker',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'password',
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  };
+}
+
+console.log('Database connection initialized with:', {
+  host: process.env.DB_HOST || 'DATABASE_URL',
+  database: process.env.DB_NAME || 'from connection string',
+  env: process.env.NODE_ENV
 });
+
+const pool = new Pool(poolConfig);
 
 // Test connection
 const connect = async () => {

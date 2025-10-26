@@ -7,6 +7,7 @@ const router = express.Router();
 // Get user's portfolio
 router.get('/', authenticateToken, async (req, res) => {
   try {
+    console.log('Fetching portfolio for user ID:', req.user.id, 'Email:', req.user.email);
     const result = await pool.query(`
       SELECT 
         p.id,
@@ -26,6 +27,7 @@ router.get('/', authenticateToken, async (req, res) => {
       ORDER BY current_value DESC
     `, [req.user.id]);
 
+    console.log('Found', result.rows.length, 'portfolio entries for user ID:', req.user.id);
     res.json(result.rows);
   } catch (err) {
     console.error('Get portfolio error:', err);
@@ -37,6 +39,14 @@ router.get('/', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const { symbol, amount, purchase_price, notes } = req.body;
+    
+    console.log('Adding to portfolio:', { 
+      userId: req.user.id, 
+      symbol, 
+      amount, 
+      purchase_price, 
+      notes 
+    });
 
     // Validation
     if (!symbol || !amount || !purchase_price) {
@@ -62,6 +72,7 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     const cryptoId = cryptoResult.rows[0].id;
+    console.log('Found crypto ID:', cryptoId, 'for symbol:', symbol);
 
     // Check if user already has this crypto in portfolio
     const existingResult = await pool.query(
@@ -70,6 +81,7 @@ router.post('/', authenticateToken, async (req, res) => {
     );
 
     if (existingResult.rows.length > 0) {
+      console.log('Updating existing portfolio entry for user:', req.user.id);
       // Update existing entry with weighted average
       const existing = existingResult.rows[0];
       const totalAmount = parseFloat(existing.amount) + parseFloat(amount);
@@ -89,11 +101,13 @@ router.post('/', authenticateToken, async (req, res) => {
         RETURNING *
       `, [totalAmount, weightedPrice, notes, req.user.id, cryptoId]);
 
+      console.log('Portfolio updated successfully for user:', req.user.id);
       return res.json({
         message: 'Portfolio updated successfully',
         portfolio: updateResult.rows[0]
       });
     } else {
+      console.log('Creating new portfolio entry for user:', req.user.id);
       // Insert new entry
       const insertResult = await pool.query(`
         INSERT INTO portfolios (user_id, crypto_id, amount, purchase_price, notes)
@@ -101,6 +115,7 @@ router.post('/', authenticateToken, async (req, res) => {
         RETURNING *
       `, [req.user.id, cryptoId, amount, purchase_price, notes]);
 
+      console.log('Portfolio entry created successfully for user:', req.user.id, 'Entry ID:', insertResult.rows[0].id);
       return res.status(201).json({
         message: 'Cryptocurrency added to portfolio',
         portfolio: insertResult.rows[0]

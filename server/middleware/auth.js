@@ -14,6 +14,7 @@ const authenticateToken = async (req, res, next) => {
     console.log('Using JWT_SECRET:', jwtSecret ? 'Set' : 'Missing');
     
     const decoded = jwt.verify(token, jwtSecret);
+    console.log('Token decoded successfully:', { userId: decoded.userId, username: decoded.username });
     
     // Verify user still exists
     const result = await pool.query(
@@ -22,9 +23,11 @@ const authenticateToken = async (req, res, next) => {
     );
 
     if (result.rows.length === 0) {
+      console.error('Token verification failed: User not found', { userId: decoded.userId });
       return res.status(401).json({ message: 'Invalid token' });
     }
 
+    console.log('User authenticated:', { userId: result.rows[0].id, username: result.rows[0].username, email: result.rows[0].email });
     req.user = result.rows[0];
     next();
   } catch (err) {

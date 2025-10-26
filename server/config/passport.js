@@ -12,6 +12,8 @@ passport.use(new GoogleStrategy({
   callbackURL: `${process.env.SERVER_URL || 'http://localhost:5000'}/api/auth/google/callback`
 }, async (accessToken, refreshToken, profile, done) => {
   try {
+    console.log('Google OAuth: Processing profile', { id: profile.id, email: profile.emails[0].value, name: profile.displayName });
+    
     // Check if user already exists with this Google ID
     let user = await pool.query(
       'SELECT * FROM users WHERE google_id = $1',
@@ -19,9 +21,18 @@ passport.use(new GoogleStrategy({
     );
 
     if (user.rows.length > 0) {
+      console.log('Google OAuth: User found by google_id:', user.rows[0].id);
+      console.log('Google OAuth: User details:', { 
+        userId: user.rows[0].id, 
+        username: user.rows[0].username, 
+        email: user.rows[0].email,
+        google_id: user.rows[0].google_id
+      });
       return done(null, user.rows[0]);
     }
 
+    console.log('Google OAuth: No user found with google_id, checking by email:', profile.emails[0].value);
+    
     // Check if user exists with this email
     user = await pool.query(
       'SELECT * FROM users WHERE email = $1',
@@ -29,22 +40,84 @@ passport.use(new GoogleStrategy({
     );
 
     if (user.rows.length > 0) {
+      console.log('Google OAuth: User found by email:', user.rows[0].id);
+      console.log('Google OAuth: Updating existing user with google_id');
       // Update existing user with Google ID
       const updatedUser = await pool.query(
         'UPDATE users SET google_id = $1, updated_at = CURRENT_TIMESTAMP WHERE email = $2 RETURNING *',
         [profile.id, profile.emails[0].value]
       );
+      console.log('Google OAuth: User updated successfully:', {
+        userId: updatedUser.rows[0].id,
+        email: updatedUser.rows[0].email,
+        google_id: updatedUser.rows[0].google_id
+      });
       return done(null, updatedUser.rows[0]);
     }
 
-    // Create new user
-    const newUser = await pool.query(
-      'INSERT INTO users (username, email, google_id) VALUES ($1, $2, $3) RETURNING *',
-      [profile.displayName, profile.emails[0].value, profile.id]
-    );
+    // Generate a unique username if displayName already exists
+    let username = profile.displayName.replace(/\s+/g, '_').toLowerCase();
+    let usernameAttempts = 0;
+    let finalUsername = username;
+    
+    while (true) {
+      const existingUser = await pool.query(
+        'SELECT id FROM users WHERE username = $1',
+        [finalUsername]
+      );
+      
+      if (existingUser.rows.length === 0) {
+        break;
+      }
+      
+      usernameAttempts++;
+      finalUsername = `${username}_${usernameAttempts}`;
+      
+      if (usernameAttempts > 100) {
+        // Fallback to timestamp-based username
+        finalUsername = `${username}_${Date.now()}`;
+        break;
+      }
+    }
+
+    console.log('Google OAuth: Creating new user with username:', finalUsername);
+    
+    // Try to create new user - wrap in try-catch to handle unique constraint violations
+    let newUser;
+    try {
+      const result = await pool.query(
+        'INSERT INTO users (username, email, google_id) VALUES ($1, $2, $3) RETURNING *',
+        [finalUsername, profile.emails[0].value, profile.id]
+      );
+      newUser = result;
+      console.log('Google OAuth: Created new user:', newUser.rows[0].id);
+    } catch (insertError) {
+      console.error('Error creating user:', insertError.message);
+      
+      // If insert failed due to unique constraint, try to find existing user
+      if (insertError.code === '23505') { // PostgreSQL unique violation
+        console.log('Username conflict, trying to find existing user by email...');
+        const existingUser = await pool.query(
+          'SELECT * FROM users WHERE email = $1 OR google_id = $2',
+          [profile.emails[0].value, profile.id]
+        );
+        
+        if (existingUser.rows.length > 0) {
+          console.log('Found existing user after insert conflict:', existingUser.rows[0].id);
+          return done(null, existingUser.rows[0]);
+        }
+      }
+      // Re-throw if it's not a unique constraint violation
+      throw insertError;
+    }
 
     // Send welcome email
-    await sendWelcomeEmail(profile.emails[0].value, profile.displayName);
+    try {
+      await sendWelcomeEmail(profile.emails[0].value, profile.displayName);
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+      // Don't fail auth if email fails
+    }
 
     return done(null, newUser.rows[0]);
   } catch (error) {
