@@ -31,16 +31,23 @@ const Portfolio = () => {
     try {
       setLoading(true);
       
+      console.log('🔍 Fetching portfolio data...');
+      console.log('Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+      
       // Fetch portfolio summary
       const summaryResponse = await axios.get('/api/portfolio/summary');
+      console.log('📊 Portfolio summary:', summaryResponse.data);
       setPortfolioSummary(summaryResponse.data);
 
       // Fetch portfolio
       const portfolioResponse = await axios.get('/api/portfolio');
+      console.log('💼 Portfolio data received:', portfolioResponse.data);
+      console.log('📈 Number of items:', portfolioResponse.data.length);
       setPortfolio(portfolioResponse.data);
 
     } catch (error) {
-      console.error('Error fetching portfolio:', error);
+      console.error('❌ Error fetching portfolio:', error);
+      console.error('Error response:', error.response?.data);
       toast.error('Failed to load portfolio');
     } finally {
       setLoading(false);
@@ -194,6 +201,27 @@ const Portfolio = () => {
         )}
 
         <div className="portfolio-content">
+          {/* Debug Info - Remove after fixing */}
+          {process.env.NODE_ENV === 'development' && (
+            <div style={{ padding: '15px', background: '#f0f0f0', borderRadius: '8px', marginBottom: '20px' }}>
+              <h4>🔍 Debug Info</h4>
+              <p><strong>Portfolio Count:</strong> {portfolio.length}</p>
+              <p><strong>Summary:</strong> {portfolioSummary ? 'Loaded' : 'Not loaded'}</p>
+              <button 
+                onClick={() => console.log('Token:', localStorage.getItem('token'))} 
+                style={{ padding: '5px 10px', marginRight: '10px' }}
+              >
+                Check Token
+              </button>
+              <button 
+                onClick={fetchPortfolio} 
+                style={{ padding: '5px 10px' }}
+              >
+                Refresh
+              </button>
+            </div>
+          )}
+          
           <div className="card">
             <div className="card-header">
               <h2 className="card-title">Portfolio Holdings</h2>
