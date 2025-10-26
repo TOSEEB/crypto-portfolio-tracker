@@ -37,7 +37,7 @@ const Navbar = () => {
                   Add Crypto
                 </Link>
                 <div className="navbar-user">
-                  <span className="user-name">Welcome, {user.name || user.username}</span>
+                  <span className="user-name">Welcome, {user.name || user.username || (user.email ? user.email.split('@')[0] : 'User')}</span>
                   {process.env.NODE_ENV === 'development' && user.email && (
                     <span style={{ fontSize: '12px', color: '#666', marginLeft: '10px' }}>
                       ({user.email})
