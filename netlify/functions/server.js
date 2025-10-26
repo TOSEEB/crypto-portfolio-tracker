@@ -692,7 +692,7 @@ exports.handler = async (event, context) => {
               id: decoded.userId || decoded.id || 1,
               email: userEmail,
               name: displayName,
-              username: decoded.username || displayName
+              username: displayName
             },
             timestamp: new Date().toISOString()
           }),
