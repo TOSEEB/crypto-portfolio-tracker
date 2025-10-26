@@ -24,7 +24,7 @@ const PriceChart = ({ symbol }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }; 
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('en-US', {

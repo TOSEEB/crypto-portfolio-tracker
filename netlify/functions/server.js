@@ -116,7 +116,7 @@ app.use(cors({
 app.use(express.json());
 
 // Helper function to extract user ID from Authorization header
-function getUserIdFromToken(event) {
+async function getUserIdFromToken(event) {
   try {
     const authHeader = (event.headers && (event.headers.authorization || event.headers.Authorization)) || '';
     if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
@@ -124,14 +124,26 @@ function getUserIdFromToken(event) {
     }
     
     const token = authHeader.split(' ')[1];
-    const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
     
-    // Check if token is expired
-    if (decoded.exp && Date.now() > decoded.exp) {
-      return null;
+    // Try to decode as JWT first (for production tokens)
+    try {
+      const jwt = require('jsonwebtoken');
+      const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+      const decoded = jwt.verify(token, jwtSecret);
+      return decoded.userId || decoded.id || 1;
+    } catch (jwtError) {
+      // If JWT verification fails, try as base64 JSON (for mock tokens)
+      try {
+        const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
+        if (decoded.exp && Date.now() > decoded.exp) {
+          return null;
+        }
+        return decoded.userId || decoded.id || 1;
+      } catch (base64Error) {
+        console.error('Token decode error:', base64Error);
+        return null;
+      }
     }
-    
-    return decoded.userId || decoded.id || 1; // Default to 1 for demo
   } catch (error) {
     console.error('Token decode error:', error);
     return null;
@@ -563,6 +575,28 @@ exports.handler = async (event, context) => {
       }
 
       const username = email.includes('@') ? email.split('@')[0] : email;
+      const userId = 1;
+
+      // Create a proper token - try JWT first, fallback to base64 JSON
+      let token;
+      try {
+        const jwt = require('jsonwebtoken');
+        const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+        token = jwt.sign(
+          { userId, email, name: username },
+          jwtSecret,
+          { expiresIn: '7d' }
+        );
+      } catch (jwtError) {
+        // Fallback to base64 JSON if JWT creation fails
+        const tokenData = {
+          userId,
+          email,
+          name: username,
+          exp: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+        };
+        token = Buffer.from(JSON.stringify(tokenData)).toString('base64');
+      }
 
       return {
         statusCode: 200,
@@ -573,11 +607,11 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({
           message: 'Login successful',
           user: {
-            id: 1,
+            id: userId,
             email,
             name: username
           },
-          token: 'mock-jwt-token-' + Date.now(),
+          token: token,
           timestamp: new Date().toISOString()
         }),
       };
@@ -617,21 +651,30 @@ exports.handler = async (event, context) => {
       try {
         // Extract token and decode it
         const token = authHeader.split(' ')[1];
-        const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
+        let decoded;
         
-        // Check if token is expired
-        if (decoded.exp && Date.now() > decoded.exp) {
-          return {
-            statusCode: 401,
-            headers: {
-              ...headers,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              error: 'Token expired',
-              timestamp: new Date().toISOString()
-            }),
-          };
+        // Try to decode as JWT first (for production tokens)
+        try {
+          const jwt = require('jsonwebtoken');
+          const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+          decoded = jwt.verify(token, jwtSecret);
+        } catch (jwtError) {
+          // If JWT verification fails, try as base64 JSON (for mock tokens)
+          decoded = JSON.parse(Buffer.from(token, 'base64').toString());
+          // Check if token is expired
+          if (decoded.exp && Date.now() > decoded.exp) {
+            return {
+              statusCode: 401,
+              headers: {
+                ...headers,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                error: 'Token expired',
+                timestamp: new Date().toISOString()
+              }),
+            };
+          }
         }
 
         return {
@@ -642,10 +685,10 @@ exports.handler = async (event, context) => {
           },
           body: JSON.stringify({
             user: {
-              id: decoded.userId || 1,
+              id: decoded.userId || decoded.id || 1,
               email: decoded.email || 'user@gmail.com',
               name: decoded.name || 'Google User',
-              username: decoded.name ? decoded.name.toLowerCase().replace(/\s+/g, '_') : 'google_user'
+              username: decoded.username || (decoded.name ? decoded.name.toLowerCase().replace(/\s+/g, '_') : 'google_user')
             },
             timestamp: new Date().toISOString()
           }),
@@ -717,7 +760,7 @@ exports.handler = async (event, context) => {
     // Profile update endpoint
     if (path === '/api/auth/profile' && method === 'PUT') {
       try {
-        const userId = getUserIdFromToken(event);
+        const userId = await getUserIdFromToken(event);
         if (!userId) {
           return {
             statusCode: 401,
@@ -982,7 +1025,7 @@ exports.handler = async (event, context) => {
         console.log('Fetching portfolio...');
         
         // Get user ID from token
-        const userId = getUserIdFromToken(event);
+        const userId = await getUserIdFromToken(event);
         if (!userId) {
           return {
             statusCode: 401,
@@ -1140,7 +1183,7 @@ exports.handler = async (event, context) => {
     if (path === '/api/portfolio/summary' && method === 'GET') {
       try {
         // Get user ID from token
-        const userId = getUserIdFromToken(event);
+        const userId = await getUserIdFromToken(event);
         if (!userId) {
           return {
             statusCode: 401,
@@ -1232,7 +1275,7 @@ exports.handler = async (event, context) => {
     if (path === '/api/portfolio' && method === 'POST') {
       try {
         // Get user ID from token
-        const userId = getUserIdFromToken(event);
+        const userId = await getUserIdFromToken(event);
         if (!userId) {
           return {
             statusCode: 401,

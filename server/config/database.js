@@ -42,6 +42,17 @@ const initializeTables = async () => {
       )
     `);
 
+    // Drop the NOT NULL constraint on password_hash if it exists
+    await pool.query(`
+      ALTER TABLE users 
+      ALTER COLUMN password_hash DROP NOT NULL
+    `).catch(err => {
+      // Ignore error if constraint doesn't exist
+      if (!err.message.includes('does not exist')) {
+        console.log('Note: password_hash column constraint adjustment:', err.message);
+      }
+    });
+
     // Cryptocurrencies table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS cryptocurrencies (

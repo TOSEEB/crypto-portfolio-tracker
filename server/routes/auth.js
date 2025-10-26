@@ -52,9 +52,10 @@ router.post('/register', async (req, res) => {
     const user = result.rows[0];
 
     // Generate JWT token
+    const jwtSecret = process.env.JWT_SECRET || 'development_secret_key_12345';
     const token = jwt.sign(
       { userId: user.id, username: user.username },
-      process.env.JWT_SECRET,
+      jwtSecret,
       { expiresIn: '7d' }
     );
 
@@ -76,18 +77,27 @@ router.post('/register', async (req, res) => {
 // Login
 router.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, email, password } = req.body;
+    console.log('Login attempt:', { username, email, hasPassword: !!password });
 
     // Validation
-    if (!username || !password) {
-      return res.status(400).json({ message: 'Username and password are required' });
+    if (!password) {
+      return res.status(400).json({ message: 'Password is required' });
     }
 
-    // Find user
+    // Check if username or email is provided
+    const identifier = username || email;
+    if (!identifier) {
+      return res.status(400).json({ message: 'Username or email is required' });
+    }
+
+    // Find user by username OR email
     const result = await pool.query(
-      'SELECT id, username, email, password_hash FROM users WHERE username = $1',
-      [username]
+      'SELECT id, username, email, password_hash FROM users WHERE username = $1 OR email = $1',
+      [identifier]
     );
+
+    console.log('User lookup result:', result.rows.length ? 'User found' : 'No user found');
 
     if (result.rows.length === 0) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -102,9 +112,10 @@ router.post('/login', async (req, res) => {
     }
 
     // Generate JWT token
+    const jwtSecret = process.env.JWT_SECRET || 'development_secret_key_12345';
     const token = jwt.sign(
       { userId: user.id, username: user.username },
-      process.env.JWT_SECRET,
+      jwtSecret,
       { expiresIn: '7d' }
     );
 

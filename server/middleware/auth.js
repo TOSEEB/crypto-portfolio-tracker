@@ -10,7 +10,10 @@ const authenticateToken = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const jwtSecret = process.env.JWT_SECRET || 'development_secret_key_12345';
+    console.log('Using JWT_SECRET:', jwtSecret ? 'Set' : 'Missing');
+    
+    const decoded = jwt.verify(token, jwtSecret);
     
     // Verify user still exists
     const result = await pool.query(
@@ -25,7 +28,7 @@ const authenticateToken = async (req, res, next) => {
     req.user = result.rows[0];
     next();
   } catch (err) {
-    console.error('Token verification error:', err);
+    console.error('Token verification error:', err.message);
     return res.status(403).json({ message: 'Invalid or expired token' });
   }
 };
