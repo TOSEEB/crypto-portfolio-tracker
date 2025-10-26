@@ -16,14 +16,21 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, jwtSecret);
     console.log('Token decoded successfully:', { userId: decoded.userId, username: decoded.username });
     
-    // Verify user still exists
+    // CRITICAL: Validate userId is an integer
+    const userId = parseInt(decoded.userId);
+    if (isNaN(userId) || userId <= 0) {
+      console.error('Invalid user ID in token:', decoded.userId);
+      return res.status(401).json({ message: 'Invalid token - bad user ID' });
+    }
+    
+    // Verify user still exists in database
     const result = await pool.query(
       'SELECT id, username, email FROM users WHERE id = $1',
-      [decoded.userId]
+      [userId]
     );
 
     if (result.rows.length === 0) {
-      console.error('Token verification failed: User not found', { userId: decoded.userId });
+      console.error('Token verification failed: User not found in database', { userId: userId });
       return res.status(401).json({ message: 'Invalid token' });
     }
 

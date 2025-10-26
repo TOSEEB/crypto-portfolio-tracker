@@ -148,20 +148,35 @@ passport.use(new JwtStrategy({
   }
 }));
 
-// Serialize user for session
+// Serialize user for session - ensure ID is an integer
 passport.serializeUser((user, done) => {
-  done(null, user.id);
+  const userId = parseInt(user.id);
+  console.log('Serializing user with ID:', userId, '(original:', user.id, ')');
+  done(null, userId);
 });
 
 // Deserialize user from session
 passport.deserializeUser(async (id, done) => {
   try {
+    const userId = parseInt(id);
+    if (isNaN(userId) || userId <= 0) {
+      console.error('Invalid user ID in deserialize:', id);
+      return done(new Error('Invalid user ID'), null);
+    }
+    
     const user = await pool.query(
       'SELECT id, username, email, google_id FROM users WHERE id = $1',
-      [id]
+      [userId]
     );
+    
+    if (user.rows.length === 0) {
+      console.error('User not found during deserialize for ID:', userId);
+      return done(new Error('User not found'), null);
+    }
+    
     done(null, user.rows[0]);
   } catch (error) {
+    console.error('Deserialize user error:', error);
     done(error, null);
   }
 });

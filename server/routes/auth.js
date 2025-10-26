@@ -260,15 +260,24 @@ router.get('/google/callback',
         google_id: user.google_id 
       });
       
-      // Generate JWT token
+      // CRITICAL: Ensure user.id is a valid integer database ID, not a timestamp
+      const userId = parseInt(user.id);
+      if (isNaN(userId) || userId <= 0) {
+        console.error('Invalid user ID detected:', user.id, 'Type:', typeof user.id);
+        return res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/login?error=invalid_user_id`);
+      }
+      
+      console.log('Using validated user ID:', userId, '(original was:', user.id, ')');
+      
+      // Generate JWT token with validated user ID
       const jwtSecret = process.env.JWT_SECRET || 'development_secret_key_12345';
       const token = jwt.sign(
-        { userId: user.id, username: user.username },
+        { userId: userId, username: user.username },
         jwtSecret,
         { expiresIn: '7d' }
       );
 
-      console.log('Google OAuth callback: JWT token generated for user ID:', user.id);
+      console.log('Google OAuth callback: JWT token generated for user ID:', userId);
 
       // Redirect to frontend with token
       const frontendUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth/callback?token=${token}`;
