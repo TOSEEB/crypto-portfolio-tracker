@@ -56,8 +56,49 @@ const getSupabase = async () => {
 const initDatabase = async () => {
   try {
     if (process.env.SUPABASE_URL && (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)) {
-      await getSupabase();
-      console.log('Using Supabase for persistence; skipping direct Postgres table creation.');
+      const sb = await getSupabase();
+      if (sb) {
+        console.log('Using Supabase for persistence.');
+        
+        // Initialize Supabase tables if they don't exist
+        try {
+          const pool = getPool();
+          
+          // Create users table
+          await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+              id SERIAL PRIMARY KEY,
+              username VARCHAR(50) UNIQUE,
+              email VARCHAR(100) UNIQUE NOT NULL,
+              password_hash VARCHAR(255),
+              google_id VARCHAR(100) UNIQUE,
+              reset_token VARCHAR(255),
+              reset_token_expires TIMESTAMP,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+          
+          // Create portfolios table (matching Netlify function schema)
+          await pool.query(`
+            CREATE TABLE IF NOT EXISTS portfolios (
+              id SERIAL PRIMARY KEY,
+              user_id INTEGER NOT NULL,
+              crypto_id VARCHAR(50) NOT NULL,
+              crypto_name VARCHAR(100) NOT NULL,
+              crypto_symbol VARCHAR(10) NOT NULL,
+              amount DECIMAL(20, 8) NOT NULL,
+              purchase_price DECIMAL(20, 8) NOT NULL,
+              purchase_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+          
+          console.log('Supabase tables verified/created successfully');
+        } catch (sbError) {
+          console.log('Note: Could not verify/create Supabase tables:', sbError.message);
+        }
+      }
       return true;
     }
     console.log('Starting database initialization...');
@@ -905,19 +946,55 @@ exports.handler = async (event, context) => {
           };
         }
         
-        // Generate unique user ID based on Google ID or timestamp
-        const uniqueUserId = userInfo.id || Math.floor(Math.random() * 1000000) + Date.now();
-        
         // Extract email and name from Google user info
         const userEmail = userInfo.email || 'user@example.com';
         const userName = userInfo.name || userEmail.split('@')[0];
+        const google_id = `google_${userInfo.id || Date.now()}`;
+        const username = userName.toLowerCase().replace(/\s+/g, '_');
+        
+        // CRITICAL: Find or create user by email, ensuring SAME user_id for SAME email
+        // This makes portfolio persistent across logouts/login sessions
+        let userId;
+        let existingUser = null;
+        
+        try {
+          const pool = getPool();
+          
+          // Check if user exists by email
+          const existingUserResult = await pool.query(
+            'SELECT id, username, email, google_id FROM users WHERE email = $1',
+            [userEmail]
+          );
+          
+          if (existingUserResult.rows.length > 0) {
+            // User exists - use their existing ID (this ensures same portfolio)
+            existingUser = existingUserResult.rows[0];
+            userId = existingUser.id;
+            console.log('✅ Existing user found - using same user_id:', { userId, email: userEmail });
+          } else {
+            // User doesn't exist - create new user
+            const insertResult = await pool.query(
+              `INSERT INTO users (username, email, google_id) 
+               VALUES ($1, $2, $3) 
+               RETURNING id, username, email`,
+              [username, userEmail, google_id]
+            );
+            userId = insertResult.rows[0].id;
+            console.log('✅ New user created with user_id:', { userId, email: userEmail });
+          }
+        } catch (dbError) {
+          console.error('❌ Database error:', dbError.message);
+          // Fallback - but this won't work with portfolio persistence
+          userId = Math.floor(Math.random() * 1000000) + Date.now();
+          console.warn('⚠️ Using fallback user ID:', userId);
+        }
         
         const googleUser = {
-          id: uniqueUserId,
-          username: userName.toLowerCase().replace(/\s+/g, '_'),
+          id: userId,
+          username: username,
           email: userEmail,
           name: userName,
-          google_id: `google_${userInfo.id || Date.now()}`
+          google_id: google_id
         };
 
         // Create a simple JWT token (in production, use proper JWT library)
@@ -928,18 +1005,17 @@ exports.handler = async (event, context) => {
           exp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
         })).toString('base64');
 
-        // Store user in database (if available)
-        try {
-          const pool = getPool();
-          await pool.query(`
-            INSERT INTO users (username, email, google_id) 
-            VALUES ($1, $2, $3) 
-            ON CONFLICT (email) DO UPDATE SET 
-            google_id = EXCLUDED.google_id,
-            updated_at = NOW()
-          `, [googleUser.username, googleUser.email, googleUser.google_id]);
-        } catch (dbError) {
-          console.log('Database not available for user storage:', dbError.message);
+        // Update google_id if user already existed
+        if (existingUser && existingUser.google_id !== google_id) {
+          try {
+            const pool = getPool();
+            await pool.query(
+              'UPDATE users SET google_id = $1 WHERE id = $2',
+              [google_id, userId]
+            );
+          } catch (updateError) {
+            console.log('Failed to update google_id:', updateError.message);
+          }
         }
 
         // Redirect to frontend with token
