@@ -59,13 +59,17 @@ router.post('/register', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    // Extract display name from email (e.g., toseebbeg02@gmail.com -> toseebbeg02)
+    const displayName = user.email ? user.email.split('@')[0] : user.username;
+    
     res.status(201).json({
       message: 'User created successfully',
       token,
       user: {
         id: user.id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        name: displayName
       }
     });
   } catch (err) {
@@ -119,13 +123,17 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    // Extract display name from email (e.g., toseebbeg02@gmail.com -> toseebbeg02)
+    const displayName = user.email ? user.email.split('@')[0] : user.username;
+    
     res.json({
       message: 'Login successful',
       token,
       user: {
         id: user.id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        name: displayName
       }
     });
   } catch (err) {
@@ -137,11 +145,15 @@ router.post('/login', async (req, res) => {
 // Get current user
 router.get('/me', authenticateToken, async (req, res) => {
   try {
+    // Extract display name from email (e.g., toseebbeg02@gmail.com -> toseebbeg02)
+    const displayName = req.user.email ? req.user.email.split('@')[0] : req.user.username;
+    
     res.json({
       user: {
         id: req.user.id,
         username: req.user.username,
-        email: req.user.email
+        email: req.user.email,
+        name: displayName
       }
     });
   } catch (err) {

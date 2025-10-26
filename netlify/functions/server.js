@@ -677,6 +677,10 @@ exports.handler = async (event, context) => {
           }
         }
 
+        // Extract display name from email (e.g., toseebbeg02@gmail.com -> toseebbeg02)
+        const userEmail = decoded.email || 'user@gmail.com';
+        const displayName = userEmail.includes('@') ? userEmail.split('@')[0] : userEmail;
+        
         return {
           statusCode: 200,
           headers: {
@@ -686,9 +690,9 @@ exports.handler = async (event, context) => {
           body: JSON.stringify({
             user: {
               id: decoded.userId || decoded.id || 1,
-              email: decoded.email || 'user@gmail.com',
-              name: decoded.name || 'Google User',
-              username: decoded.username || (decoded.name ? decoded.name.toLowerCase().replace(/\s+/g, '_') : 'google_user')
+              email: userEmail,
+              name: displayName,
+              username: decoded.username || displayName
             },
             timestamp: new Date().toISOString()
           }),
