@@ -1199,7 +1199,7 @@ exports.handler = async (event, context) => {
         
         // Prefer Supabase, then Postgres, then memory
         let portfolio = [];
-        const sb = getSupabase();
+        const sb = await getSupabase();
         if (sb) {
           const { data, error } = await sb.from('portfolios').select('*').eq('user_id', userId);
           if (error) throw error;
@@ -1222,23 +1222,31 @@ exports.handler = async (event, context) => {
         let totalValue = 0;
 
         const cryptoData = await fetchCryptoData();
+        console.log('Portfolio items fetched:', portfolio.length);
+        console.log('Sample portfolio item:', portfolio[0]);
+        console.log('Available crypto symbols:', cryptoData.slice(0, 5).map(c => c.symbol));
 
         portfolio.forEach(item => {
           const amount = parseFloat(item.amount);
           const purchasePrice = parseFloat(item.purchase_price);
+          const symbol = item.crypto_symbol || item.symbol;
+          
           if (!isNaN(amount) && !isNaN(purchasePrice)) {
             totalInvested += amount * purchasePrice;
           }
-          const currentCrypto = cryptoData.find(c => c.symbol === (item.crypto_symbol || item.symbol));
+          
+          const currentCrypto = cryptoData.find(c => c.symbol === symbol);
           if (currentCrypto && !isNaN(amount)) {
             totalValue += amount * currentCrypto.current_price;
+          } else if (!currentCrypto && symbol) {
+            console.log('Crypto not found for symbol:', symbol);
           }
         });
 
         const totalProfit = totalValue - totalInvested;
         const profitPercentage = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
 
-        console.log('Portfolio summary:', { totalInvested, totalValue, portfolioCount: portfolio.length });
+        console.log('Portfolio summary calculated:', { totalInvested, totalValue, totalProfit, profitPercentage, portfolioCount: portfolio.length });
         return {
           statusCode: 200,
           headers: {
