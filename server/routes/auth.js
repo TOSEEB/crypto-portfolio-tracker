@@ -115,23 +115,23 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Generate JWT token
+    // Extract display name from email (e.g., toseebbeg02@gmail.com -> toseebbeg02)
+    const displayName = user.email ? user.email.split('@')[0] : user.username;
+    
+    // Generate JWT token with email included
     const jwtSecret = process.env.JWT_SECRET || 'development_secret_key_12345';
     const token = jwt.sign(
-      { userId: user.id, username: user.username },
+      { userId: user.id, username: displayName, email: user.email },
       jwtSecret,
       { expiresIn: '7d' }
     );
 
-    // Extract display name from email (e.g., toseebbeg02@gmail.com -> toseebbeg02)
-    const displayName = user.email ? user.email.split('@')[0] : user.username;
-    
     res.json({
       message: 'Login successful',
       token,
       user: {
         id: user.id,
-        username: user.username,
+        username: displayName,
         email: user.email,
         name: displayName
       }
