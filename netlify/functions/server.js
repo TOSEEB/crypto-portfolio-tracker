@@ -105,12 +105,29 @@ const initDatabase = async () => {
     console.log('DB Host:', process.env.DB_HOST);
     console.log('DB Name:', process.env.DB_NAME);
     console.log('DB User:', process.env.DB_USER);
-    
-const pool = getPool();
+
+    const pool = getPool();
+
+    // Ensure users table exists (required for Google OAuth save/find)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(50) UNIQUE,
+        email VARCHAR(100) UNIQUE NOT NULL,
+        password_hash VARCHAR(255),
+        google_id VARCHAR(100) UNIQUE,
+        reset_token VARCHAR(255),
+        reset_token_expires TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Ensure portfolios table exists
     await pool.query(`
       CREATE TABLE IF NOT EXISTS portfolios (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER DEFAULT 1,
+        user_id INTEGER NOT NULL,
         crypto_id VARCHAR(50) NOT NULL,
         crypto_name VARCHAR(100) NOT NULL,
         crypto_symbol VARCHAR(10) NOT NULL,
@@ -997,13 +1014,25 @@ exports.handler = async (event, context) => {
           google_id: google_id
         };
 
-        // Create a simple JWT token (in production, use proper JWT library)
-        const token = Buffer.from(JSON.stringify({
-          userId: googleUser.id,
-          email: googleUser.email,
-          name: googleUser.name,
-          exp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
-        })).toString('base64');
+        // Create a signed JWT token for the frontend
+        let token;
+        try {
+          const jwt = require('jsonwebtoken');
+          const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+          token = jwt.sign(
+            { userId: googleUser.id, email: googleUser.email, name: googleUser.name },
+            jwtSecret,
+            { expiresIn: '7d' }
+          );
+        } catch (signErr) {
+          // Fallback (base64 JSON) to avoid blocking login if jsonwebtoken fails
+          token = Buffer.from(JSON.stringify({
+            userId: googleUser.id,
+            email: googleUser.email,
+            name: googleUser.name,
+            exp: Date.now() + (7 * 24 * 60 * 60 * 1000)
+          })).toString('base64');
+        }
 
         // Update google_id if user already existed
         if (existingUser && existingUser.google_id !== google_id) {
