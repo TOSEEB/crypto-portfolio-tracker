@@ -716,6 +716,7 @@ exports.handler = async (event, context) => {
           const jwt = require('jsonwebtoken');
           const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
           decoded = jwt.verify(token, jwtSecret);
+          console.log('🔍 Token decoded (JWT):', { userId: decoded.userId, email: decoded.email });
         } catch (jwtError) {
           // If JWT verification fails, try as base64 JSON (for mock tokens)
           decoded = JSON.parse(Buffer.from(token, 'base64').toString());
@@ -733,11 +734,15 @@ exports.handler = async (event, context) => {
               }),
             };
           }
+          console.log('🔍 Token decoded (base64):', { userId: decoded.userId, email: decoded.email });
         }
 
         // Extract display name from email (e.g., toseebbeg02@gmail.com -> toseebbeg02)
         const userEmail = decoded.email || 'user@gmail.com';
         const displayName = userEmail.includes('@') ? userEmail.split('@')[0] : userEmail;
+        const userId = decoded.userId || decoded.id || 1;
+        
+        console.log('👤 /api/auth/me returning user:', { userId, email: userEmail });
         
         return {
           statusCode: 200,
@@ -747,7 +752,7 @@ exports.handler = async (event, context) => {
           },
           body: JSON.stringify({
             user: {
-              id: decoded.userId || decoded.id || 1,
+              id: userId,
               email: userEmail,
               name: displayName,
               username: displayName
@@ -767,6 +772,81 @@ exports.handler = async (event, context) => {
             error: 'Invalid token',
             timestamp: new Date().toISOString()
           }),
+        };
+      }
+    }
+    
+    // Debug endpoint to check token and user data
+    if (path === '/api/debug-auth' && method === 'GET') {
+      try {
+        const userId = await getUserIdFromToken(event);
+        const authHeader = (event.headers && (event.headers.authorization || event.headers.Authorization)) || '';
+        let tokenInfo = null;
+        
+        if (authHeader.startsWith('Bearer ')) {
+          const token = authHeader.split(' ')[1];
+          try {
+            const jwt = require('jsonwebtoken');
+            const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+            tokenInfo = jwt.verify(token, jwtSecret);
+          } catch {
+            try {
+              tokenInfo = JSON.parse(Buffer.from(token, 'base64').toString());
+            } catch {}
+          }
+        }
+        
+        // Try to fetch user from database
+        let dbUser = null;
+        try {
+          const sb = await getSupabase();
+          if (sb && userId) {
+            const { data } = await sb.from('users').select('*').eq('id', userId).single();
+            dbUser = data;
+          } else if (userId) {
+            const pool = getPool();
+            const result = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+            dbUser = result.rows[0] || null;
+          }
+        } catch (dbErr) {
+          console.error('Error fetching user:', dbErr);
+        }
+        
+        // Try to fetch portfolio count
+        let portfolioCount = 0;
+        try {
+          const sb = await getSupabase();
+          if (sb && userId) {
+            const { count } = await sb.from('portfolios').select('*', { count: 'exact', head: true }).eq('user_id', userId);
+            portfolioCount = count || 0;
+          } else if (userId) {
+            const pool = getPool();
+            const result = await pool.query('SELECT COUNT(*) FROM portfolios WHERE user_id = $1', [userId]);
+            portfolioCount = parseInt(result.rows[0].count) || 0;
+          }
+        } catch (portErr) {
+          console.error('Error counting portfolio:', portErr);
+        }
+        
+        return {
+          statusCode: 200,
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tokenUserId: userId,
+            tokenInfo,
+            dbUser,
+            portfolioCount,
+            timestamp: new Date().toISOString()
+          })
+        };
+      } catch (error) {
+        return {
+          statusCode: 200,
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            error: error.message,
+            timestamp: new Date().toISOString()
+          })
         };
       }
     }
@@ -963,47 +1043,105 @@ exports.handler = async (event, context) => {
           };
         }
         
-        // Extract email and name from Google user info
-        const userEmail = userInfo.email || 'user@example.com';
+        // Extract email and name from Google user info - normalize email to lowercase
+        const userEmail = (userInfo.email || 'user@example.com').toLowerCase().trim();
         const userName = userInfo.name || userEmail.split('@')[0];
         const google_id = `google_${userInfo.id || Date.now()}`;
         const username = userName.toLowerCase().replace(/\s+/g, '_');
         
-        // CRITICAL: Find or create user by email, ensuring SAME user_id for SAME email
-        // This makes portfolio persistent across logouts/login sessions
+        console.log('🔍 Google login - Looking up/creating user:', { email: userEmail, google_id });
+        
+        // Find or create user by email using Supabase client first (HTTPS, avoids IPv6 issues).
+        // Falls back to direct Postgres only if Supabase client is not configured.
         let userId;
         let existingUser = null;
+        let usingSupabase = false;
         
         try {
-          const pool = getPool();
-          
-          // Check if user exists by email
-          const existingUserResult = await pool.query(
-            'SELECT id, username, email, google_id FROM users WHERE email = $1',
-            [userEmail]
-          );
-          
-          if (existingUserResult.rows.length > 0) {
-            // User exists - use their existing ID (this ensures same portfolio)
-            existingUser = existingUserResult.rows[0];
-            userId = existingUser.id;
-            console.log('✅ Existing user found - using same user_id:', { userId, email: userEmail });
+          const sb = await getSupabase();
+          if (sb) {
+            usingSupabase = true;
+            // Try to find user by email (case-insensitive via LOWER in SQL or normalize)
+            const { data: usersByEmail, error: findErr } = await sb
+              .from('users')
+              .select('id, username, email, google_id')
+              .eq('email', userEmail)
+              .limit(1);
+            
+            if (findErr) {
+              console.error('❌ Supabase user lookup error:', findErr);
+              throw findErr;
+            }
+
+            if (usersByEmail && usersByEmail.length > 0) {
+              existingUser = usersByEmail[0];
+              userId = existingUser.id;
+              console.log('✅ Existing user found in Supabase - using same user_id:', { 
+                userId, 
+                email: userEmail,
+                existingGoogleId: existingUser.google_id,
+                newGoogleId: google_id
+              });
+            } else {
+              // Insert new user
+              const { data: inserted, error: insertErr } = await sb
+                .from('users')
+                .insert({ username, email: userEmail, google_id })
+                .select('id, username, email')
+                .single();
+              
+              if (insertErr) {
+                console.error('❌ Supabase user insert error:', insertErr);
+                // If insert fails due to unique constraint, try finding again
+                if (insertErr.code === '23505') {
+                  const { data: foundAfterConflict } = await sb
+                    .from('users')
+                    .select('id, username, email, google_id')
+                    .eq('email', userEmail)
+                    .limit(1)
+                    .single();
+                  if (foundAfterConflict) {
+                    existingUser = foundAfterConflict;
+                    userId = foundAfterConflict.id;
+                    console.log('✅ User found after insert conflict:', { userId, email: userEmail });
+                  } else {
+                    throw insertErr;
+                  }
+                } else {
+                  throw insertErr;
+                }
+              } else {
+                userId = inserted.id;
+                console.log('✅ New user created in Supabase with user_id:', { userId, email: userEmail });
+              }
+            }
           } else {
-            // User doesn't exist - create new user
-            const insertResult = await pool.query(
-              `INSERT INTO users (username, email, google_id) 
-               VALUES ($1, $2, $3) 
-               RETURNING id, username, email`,
-              [username, userEmail, google_id]
+            // Supabase not configured – fallback to Postgres pool
+            const pool = getPool();
+            const existingUserResult = await pool.query(
+              'SELECT id, username, email, google_id FROM users WHERE LOWER(email) = LOWER($1)',
+              [userEmail]
             );
-            userId = insertResult.rows[0].id;
-            console.log('✅ New user created with user_id:', { userId, email: userEmail });
+            if (existingUserResult.rows.length > 0) {
+              existingUser = existingUserResult.rows[0];
+              userId = existingUser.id;
+              console.log('✅ Existing user found (Postgres) - using same user_id:', { userId, email: userEmail });
+            } else {
+              const insertResult = await pool.query(
+                `INSERT INTO users (username, email, google_id) 
+                 VALUES ($1, $2, $3) 
+                 RETURNING id, username, email`,
+                [username, userEmail, google_id]
+              );
+              userId = insertResult.rows[0].id;
+              console.log('✅ New user created (Postgres) with user_id:', { userId, email: userEmail });
+            }
           }
         } catch (dbError) {
-          console.error('❌ Database error:', dbError.message);
-          // Fallback - but this won't work with portfolio persistence
+          console.error('❌ User persistence error:', dbError.message, dbError.code);
+          // Fallback to temp ID (not persistent) to avoid blocking login
           userId = Math.floor(Math.random() * 1000000) + Date.now();
-          console.warn('⚠️ Using fallback user ID:', userId);
+          console.warn('⚠️ Using non-persistent fallback user ID:', userId);
         }
         
         const googleUser = {
@@ -1034,18 +1172,33 @@ exports.handler = async (event, context) => {
           })).toString('base64');
         }
 
-        // Update google_id if user already existed
+        // Update google_id if user already existed but google_id differs
         if (existingUser && existingUser.google_id !== google_id) {
           try {
-            const pool = getPool();
-            await pool.query(
-              'UPDATE users SET google_id = $1 WHERE id = $2',
-              [google_id, userId]
-            );
+            if (usingSupabase) {
+              const sb = await getSupabase();
+              if (sb) {
+                const { error: updateErr } = await sb
+                  .from('users')
+                  .update({ google_id })
+                  .eq('id', userId);
+                if (updateErr) throw updateErr;
+                console.log('✅ Updated google_id in Supabase for user:', userId);
+              }
+            } else {
+              const pool = getPool();
+              await pool.query(
+                'UPDATE users SET google_id = $1 WHERE id = $2',
+                [google_id, userId]
+              );
+              console.log('✅ Updated google_id in Postgres for user:', userId);
+            }
           } catch (updateError) {
-            console.log('Failed to update google_id:', updateError.message);
+            console.log('⚠️ Failed to update google_id:', updateError.message);
           }
         }
+        
+        console.log('🔑 Creating JWT token for user:', { userId, email: userEmail });
 
         // Redirect to frontend with token
         return {
@@ -1166,11 +1319,12 @@ exports.handler = async (event, context) => {
     // Portfolio endpoints
     if (path === '/api/portfolio' && method === 'GET') {
       try {
-        console.log('Fetching portfolio...');
+        console.log('📊 Fetching portfolio...');
         
         // Get user ID from token
         const userId = await getUserIdFromToken(event);
         if (!userId) {
+          console.error('❌ No user ID found in token');
           return {
             statusCode: 401,
             headers: { ...headers, 'Content-Type': 'application/json' },
@@ -1181,7 +1335,7 @@ exports.handler = async (event, context) => {
           };
         }
         
-        console.log('Fetching portfolio for user ID:', userId);
+        console.log('📊 Fetching portfolio for user ID:', userId);
         
         // Try Supabase first, then Postgres
         try {
@@ -1222,7 +1376,7 @@ exports.handler = async (event, context) => {
               return item;
             });
 
-            console.log('Returning portfolio with', updatedPortfolio.length, 'items from Supabase');
+            console.log('📊 Returning portfolio with', updatedPortfolio.length, 'items from Supabase for user', userId);
             return {
               statusCode: 200,
               headers: {
@@ -1272,7 +1426,7 @@ exports.handler = async (event, context) => {
             return item;
           });
 
-          console.log('Returning portfolio with', updatedPortfolio.length, 'items from database');
+          console.log('📊 Returning portfolio with', updatedPortfolio.length, 'items from Postgres for user', userId);
           return {
             statusCode: 200,
             headers: {
@@ -1439,9 +1593,10 @@ exports.handler = async (event, context) => {
           };
         }
         
-        console.log('Adding portfolio item for user ID:', userId);
+        console.log('➕ Adding portfolio item for user ID:', userId);
         
         const body = event.body ? JSON.parse(event.body) : {};
+        console.log('➕ Portfolio payload:', { userId, body: JSON.stringify(body) });
         // Normalize incoming payload from UI
         let incomingSymbol = (body.crypto_symbol || body.symbol || '').toString().trim().toUpperCase();
         let normalizedAmount = body.amount !== undefined ? parseFloat(body.amount) : NaN;
@@ -1494,7 +1649,7 @@ exports.handler = async (event, context) => {
               .single();
             if (error) throw error;
 
-            console.log('Crypto added successfully to Supabase:', data);
+            console.log('✅ Crypto added successfully to Supabase:', { userId, data });
             return {
               statusCode: 201,
               headers: {
@@ -1525,7 +1680,7 @@ exports.handler = async (event, context) => {
             [userId, crypto_id, crypto_name, crypto_symbol, amount, purchase_price]  // Use actual user ID
           );
 
-          console.log('Crypto added successfully to PostgreSQL:', result.rows[0]);
+          console.log('✅ Crypto added successfully to PostgreSQL:', { userId, data: result.rows[0] });
 
           return {
             statusCode: 201,
