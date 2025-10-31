@@ -614,65 +614,149 @@ exports.handler = async (event, context) => {
 
     // Auth: Login (POST)
     if (path === '/api/auth/login' && method === 'POST') {
-      const body = event.body ? JSON.parse(event.body) : {};
+      try {
+        const body = event.body ? JSON.parse(event.body) : {};
+        const email = typeof body.email === 'string' ? body.email.toLowerCase().trim() : '';
+        const password = typeof body.password === 'string' ? body.password : '';
 
-      const email = typeof body.email === 'string' ? body.email.trim() : '';
-      const password = typeof body.password === 'string' ? body.password : '';
+        if (!email || !password) {
+          return {
+            statusCode: 400,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: 'Email and password are required' }),
+          };
+        }
 
-      if (!email || !password) {
+        console.log('🔐 Login attempt for email:', email);
+
+        // Look up user by email
+        let user = null;
+        try {
+          const sb = await getSupabase();
+          if (sb) {
+            const { data: users, error: findErr } = await sb
+              .from('users')
+              .select('id, username, email, password_hash, google_id')
+              .eq('email', email)
+              .limit(1)
+              .single();
+            if (!findErr && users) {
+              user = users;
+            } else if (!findErr) {
+              // Try without single() if it fails
+              const { data: userList } = await sb
+                .from('users')
+                .select('id, username, email, password_hash, google_id')
+                .eq('email', email)
+                .limit(1);
+              if (userList && userList.length > 0) {
+                user = userList[0];
+              }
+            }
+          } else {
+            const pool = getPool();
+            const result = await pool.query(
+              'SELECT id, username, email, password_hash, google_id FROM users WHERE LOWER(email) = LOWER($1)',
+              [email]
+            );
+            if (result.rows.length > 0) {
+              user = result.rows[0];
+            }
+          }
+        } catch (dbError) {
+          console.error('❌ Database error during login lookup:', dbError.message);
+          return {
+            statusCode: 500,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: 'Server error during login' }),
+          };
+        }
+
+        // Check if user exists
+        if (!user) {
+          console.log('❌ Login failed: User not found');
+          return {
+            statusCode: 401,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: 'Invalid email or password' }),
+          };
+        }
+
+        // SECURITY: If user was created via Google OAuth (no password_hash), reject password login
+        if (!user.password_hash || user.password_hash === null) {
+          console.log('❌ Login rejected: User created via Google OAuth - no password set');
+          return {
+            statusCode: 401,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              message: 'This account was created with Google. Please sign in with Google instead.',
+              requiresGoogleLogin: true
+            }),
+          };
+        }
+
+        // Verify password using bcrypt
+        const bcrypt = require('bcryptjs');
+        const isValidPassword = await bcrypt.compare(password, user.password_hash);
+        
+        if (!isValidPassword) {
+          console.log('❌ Login failed: Invalid password');
+          return {
+            statusCode: 401,
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: 'Invalid email or password' }),
+          };
+        }
+
+        // Password is correct - generate token
+        const username = user.username || email.split('@')[0];
+        const userId = user.id;
+        
+        console.log('✅ Login successful for user:', { userId, email });
+
+        let token;
+        try {
+          const jwt = require('jsonwebtoken');
+          const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+          token = jwt.sign(
+            { userId, email, name: username },
+            jwtSecret,
+            { expiresIn: '7d' }
+          );
+        } catch (jwtError) {
+          // Fallback to base64 JSON if JWT creation fails
+          const tokenData = {
+            userId,
+            email,
+            name: username,
+            exp: Date.now() + (7 * 24 * 60 * 60 * 1000)
+          };
+          token = Buffer.from(JSON.stringify(tokenData)).toString('base64');
+        }
+
         return {
-          statusCode: 400,
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json',
-          },
+          statusCode: 200,
+          headers: { ...headers, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            message: 'Email and password are required'
+            message: 'Login successful',
+            user: {
+              id: userId,
+              email,
+              name: username,
+              username: username
+            },
+            token: token,
+            timestamp: new Date().toISOString()
           }),
         };
-      }
-
-      const username = email.includes('@') ? email.split('@')[0] : email;
-      const userId = 1;
-
-      // Create a proper token - try JWT first, fallback to base64 JSON
-      let token;
-      try {
-        const jwt = require('jsonwebtoken');
-        const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
-        token = jwt.sign(
-          { userId, email, name: username },
-          jwtSecret,
-          { expiresIn: '7d' }
-        );
-      } catch (jwtError) {
-        // Fallback to base64 JSON if JWT creation fails
-        const tokenData = {
-          userId,
-          email,
-          name: username,
-          exp: Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 days
+      } catch (error) {
+        console.error('❌ Login error:', error.message);
+        return {
+          statusCode: 500,
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: 'Server error during login' }),
         };
-        token = Buffer.from(JSON.stringify(tokenData)).toString('base64');
       }
-
-      return {
-        statusCode: 200,
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: 'Login successful',
-          user: {
-            id: userId,
-            email,
-            name: username
-          },
-          token: token,
-          timestamp: new Date().toISOString()
-        }),
-      };
     }
 
     // Auth: Login (GET) - helpful hint for users hitting the URL directly
